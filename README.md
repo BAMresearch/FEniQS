@@ -5,7 +5,7 @@ FEniQS contains the following main modules:
 
 **structure:**
 
-For defining of a structural mechanics experiment, including **geometry**, **mesh**, **boundary conditions** (BCs), and _time-varying_ **loadings**. The time is _quasi-static_, i.e. no dynamic (inertia) effect is modelled (in the problem module below).
+For defining a structural mechanics experiment, including **geometry**, **mesh**, **boundary conditions** (BCs), and _time-varying_ **loadings**. The time is _quasi-static_, i.e. no dynamic (inertia) effect is modelled (in the problem module below).
 
 **material:**
 
