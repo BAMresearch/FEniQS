@@ -1,0 +1,17 @@
+name: feniqs
+channels:
+  - anaconda
+  - conda-forge
+  - defaults
+dependencies:
+  - fenics=2019.1.0
+  - python
+  - numpy
+  - matplotlib
+  - yaml
+  - pyyaml
+  - meshio
+  - gmsh
+  - pip
+  - pip:
+      - gmsh
