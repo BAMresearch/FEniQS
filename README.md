@@ -3,9 +3,13 @@ A library for simulating structural mechanics problems in FEniCS.
 
 FEniQS contains the following main modules:
 
-**structure:** for definition of a structural mechanics experiment, including **geometry**, **mesh**, **boundary conditions** (BCs), and _time-varying_ **loadings**. The time is _quasi-static_, i.e. no dynamic (inertia) effect is modelled (in the problem module below).
+**structure:**
 
-**material:** for handling **constitutive laws** such as _elasticity_, _gradient damage_, _plasticity_, etc.
+for definition of a structural mechanics experiment, including **geometry**, **mesh**, **boundary conditions** (BCs), and _time-varying_ **loadings**. The time is _quasi-static_, i.e. no dynamic (inertia) effect is modelled (in the problem module below).
+
+**material:**
+
+for handling **constitutive laws** such as _elasticity_, _gradient damage_, _plasticity_, etc.
 
 **problem:**
 
