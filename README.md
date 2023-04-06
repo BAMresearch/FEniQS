@@ -1,5 +1,5 @@
 # FEniQS
-A library for simulating structural mechanics problems in FEniCS.
+A library for simulating static/quasi-static structural mechanics problems in FEniCS.
 
 FEniQS contains the following main modules:
 
