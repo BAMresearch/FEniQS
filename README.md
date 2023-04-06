@@ -1,5 +1,6 @@
 # FEniQS
 A library for simulating structural mechanics problems in FEniCS.
+
 FEniQS contains the following main modules:
   ## structure:
   For definition of a structural mechanics experiment, including geometry, mesh, boundary conditions (BCs), and time-varying loadings.
