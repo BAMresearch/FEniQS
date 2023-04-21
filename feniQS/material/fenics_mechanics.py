@@ -23,15 +23,17 @@ def ss_dim(constraint):
     _dim = constraint_switcher.get(constraint, "Invalid constraint given. Possible values are: " + str(constraint_switcher.keys()))
     return _dim
 
-def eps_vector(v, constraint):
+def eps_vector(v, constraint, ss_vector='default'):
     _ss_dim = ss_dim(constraint)
+    if ss_vector=='default':
+        ss_vector = _ss_vector
     if _ss_dim==1:
         return df.grad(v)
     else:
         e = df.sym(df.grad(v))
-        if _ss_vector == 'Voigt':
+        if ss_vector.lower() == 'voigt':
             _fact = 2
-        elif _ss_vector == 'Mandel':
+        elif ss_vector.lower() == 'mandel':
             _fact = 2 ** 0.5
         
         if _ss_dim==3:
@@ -41,6 +43,27 @@ def eps_vector(v, constraint):
         elif _ss_dim==6:
             return df.as_vector( [ e[0, 0], e[1, 1], e[2, 2] \
                                  , _fact * e[1, 2], _fact * e[0, 2], _fact * e[0, 1] ] )
+
+def sigma_vector(sigma, constraint, ss_vector='default'):
+    _ss_dim = ss_dim(constraint)
+    if ss_vector=='default':
+        ss_vector = _ss_vector
+    if _ss_dim==1:
+        return sigma
+    else:
+        if ss_vector.lower() == 'voigt':
+            _fact = 1
+        elif ss_vector.lower() == 'mandel':
+            _fact = 2 ** 0.5
+        
+        if _ss_dim==3:
+            return df.as_vector([sigma[0, 0], sigma[1, 1], _fact * sigma[0, 1]])
+        elif _ss_dim==4:
+            return df.as_vector([sigma[0, 0], sigma[1, 1], 0., _fact * sigma[0, 1]])
+            # IMPORTANT: In plane strain, the out of plane stress must be computed and replaced via: sigma_33 = nu * (sigma_11 + sigma_22) 
+        elif _ss_dim==6:
+            return df.as_vector( [ sigma[0, 0], sigma[1, 1], sigma[2, 2] \
+                                 , _fact * sigma[1, 2], _fact * sigma[0, 2], _fact * sigma[0, 1] ] )
 
 def constitutive_coeffs(E=1000, nu=0.0, constraint='PLANE_STRESS'):
     lamda=(E*nu/(1+nu))/(1-2*nu)
