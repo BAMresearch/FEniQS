@@ -208,31 +208,3 @@ class HomogenizationElasticDirichlet(HomogenizationElastic):
     
     def get_sigma(self):
         return self.mat.sigma(self.get_uu())
-
-if __name__ == "__main__":
-    df.set_log_level(20)
-    
-    class FenConfig:
-        shF_degree_u = 1
-        el_family = 'CG'
-    
-    mesh = df.RectangleMesh(df.Point(0.,0.), df.Point(2.,2.), 5, 8)
-    RVE_volume = 2. * 2.
-    mat = ElasticConstitutive(E=1000., nu=0.2, constraint='PLANE_STRAIN')
-    hom_problem = HomogenizationElasticDirichlet(mat=mat, mesh=mesh, fen_config=FenConfig(), RVE_volume=RVE_volume)
-    hom_problem.build_variational_functionals()
-    
-    tol = mesh.rmin() / 1000.
-    def RVE_boundaries(x, on_boundary):
-        if (df.near(x[0], 0., tol) \
-            or df.near(x[1], 0., tol) \
-                or df.near(x[0], 2., tol) \
-                    or df.near(x[1], 2., tol)):
-            # print("even2d", end = "")
-            return True
-    
-    hom_problem.build_DirichletBC(RVE_boundaries)
-    hom_problem.build_solver(get_fenicsSolverOptions())
-    hom_problem.run_hom()
-    
-    df.set_log_level(30)
