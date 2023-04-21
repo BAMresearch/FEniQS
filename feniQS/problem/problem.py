@@ -43,13 +43,13 @@ class ElasticPars(ParsBase):
             # self.constraint = 'PLANE_STRESS'
             # self.constraint     = '3D'
             
-            self.E_min          = 1e5
-            self.E              = 1e5 #40e4 # will be added to self.E_min
-            self.nu             = 0.3
+            self.E_min          = 0. # will be added to self.E
+            self.E              = 1e3
+            self.nu             = 0.2
             
             self.mat_type       = 'elastic'
             
-            self.el_family      = 'Lagrange'
+            self.el_family      = 'CG'
             self.shF_degree_u   = 1
             self.integ_degree   = 2
             
@@ -69,30 +69,30 @@ class GDMPars(ParsBase):
     def __init__(self, pars0=None, **kwargs):
         ParsBase.__init__(self, pars0)
         if len(kwargs)==0: # Default values are set
-            # self.constraint = 'UNIAXIAL'
+            self.constraint = 'UNIAXIAL'
             # self.constraint = 'PLANE_STRAIN'
-            self.constraint = 'PLANE_STRESS'
+            # self.constraint = 'PLANE_STRESS'
             # self.constraint     = '3D'
             
-            self.E_min = 20e4
-            self.E = 40e4 # will be added to self.E_min
-            self.nu = 0.18
+            self.E_min = 0. # will be added to self.E
+            self.E = 1e3
+            self.nu = 0.2
             
             self.mat_type = 'gdm' # always
             self.damage_law = 'exp'
             # self.damage_law = 'perfect'
             # self.damage_law = 'linear'
             
-            self.e0_min = 10e-4
-            self.e0 = 1e-4 # will be added to self.e0_min
+            self.e0_min = 0. # will be added to self.e0
+            self.e0 = 1e-4
             
             self.ef_min = 0.
             self.ef = 30e-4
             
             self.alpha = 0.99
             
-            self.c_min = 10
-            self.c = 10 # will be added to self.c_min
+            self.c_min = 0. # will be added to self.c
+            self.c = 10.
             
             self.el_family = 'Lagrange'
             self.shF_degree_u = 1
