@@ -2,12 +2,14 @@ import sys
 if './' not in sys.path:
     sys.path.append('./')
 
+from feniQS.general.parameters import *
 from feniQS.material.constitutive import *
 from feniQS.fenics_helpers.fenics_functions import *
 from feniQS.fenics_helpers.fenics_expressions import *
 from feniQS.problem.fenics_solvers import *
 
 pth_problem = CollectPaths('problem.py')
+pth_problem.add_script(pth_general)
 pth_problem.add_script(pth_constitutive)
 pth_problem.add_script(pth_fenics_functions)
 pth_problem.add_script(pth_fenics_expressions)
@@ -31,6 +33,83 @@ class NewtonSolverFromLinearSolver(df.NewtonSolver):
     
     def solver_setup(self, A, P, problem, iteration):
         self.linear_solver().set_operator(A)
+
+class ElasticPars(ParsBase):
+    def __init__(self, pars0=None, **kwargs):
+        ParsBase.__init__(self, pars0) # pars0 :: ParsBoxCompressed(ParsBase)
+        if len(kwargs)==0: # Default values are set
+            self.constraint = 'UNIAXIAL'
+            # self.constraint = 'PLANE_STRAIN'
+            # self.constraint = 'PLANE_STRESS'
+            # self.constraint     = '3D'
+            
+            self.E_min          = 1e5
+            self.E              = 1e5 #40e4 # will be added to self.E_min
+            self.nu             = 0.3
+            
+            self.mat_type       = 'elastic'
+            
+            self.el_family      = 'Lagrange'
+            self.shF_degree_u   = 1
+            self.integ_degree   = 2
+            
+            self.softenned_pars = ['E']
+                # Parameters to be converted from/to FEniCS constant (to be modified more easily)
+            
+            self._write_files = True
+            
+            self.f = None # No body force
+            
+            self.analytical_jac = False # whether 'preparation' is done for analytical computation of Jacobian
+            
+        else: # Get from a dictionary
+            ParsBase.__init__(self, **kwargs)
+
+class GDMPars(ParsBase):
+    def __init__(self, pars0=None, **kwargs):
+        ParsBase.__init__(self, pars0)
+        if len(kwargs)==0: # Default values are set
+            # self.constraint = 'UNIAXIAL'
+            # self.constraint = 'PLANE_STRAIN'
+            self.constraint = 'PLANE_STRESS'
+            # self.constraint     = '3D'
+            
+            self.E_min = 20e4
+            self.E = 40e4 # will be added to self.E_min
+            self.nu = 0.18
+            
+            self.mat_type = 'gdm' # always
+            self.damage_law = 'exp'
+            # self.damage_law = 'perfect'
+            # self.damage_law = 'linear'
+            
+            self.e0_min = 10e-4
+            self.e0 = 1e-4 # will be added to self.e0_min
+            
+            self.ef_min = 0.
+            self.ef = 30e-4
+            
+            self.alpha = 0.99
+            
+            self.c_min = 10
+            self.c = 10 # will be added to self.c_min
+            
+            self.el_family = 'Lagrange'
+            self.shF_degree_u = 1
+            self.shF_degree_ebar = 1
+            self.integ_degree = 2
+            
+            self.softenned_pars = ('E', 'e0', 'ef', 'c')
+                # Parameters to be converted from/to FEniCS constant (to be modified more easily)
+            
+            self._write_files = True
+            
+            self.f = None # No body force
+            
+            self.analytical_jac = False # whether 'preparation' is done for analytical computation of Jacobian
+            
+        else: # Get from a dictionary
+            ParsBase.__init__(self, **kwargs)
 
 class FenicsProblem():
     def __init__(self, mat, mesh, fen_config, dep_dim=None \

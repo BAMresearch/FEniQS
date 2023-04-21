@@ -21,51 +21,6 @@ def get_QSM_GDM(pars_struct, cls_struct, pars_gdm, _path=None, _name=None):
     struct = cls_struct(pars=pars_struct, _path=_path, _name=_name)
     return QSModelGDM(pars=pars_gdm, struct=struct, _path=_path, _name=_name)
 
-class GDMPars(ParsBase):
-    def __init__(self, pars0=None, **kwargs):
-        ParsBase.__init__(self, pars0)
-        if len(kwargs)==0: # Default values are set
-            # self.constraint = 'UNIAXIAL'
-            # self.constraint = 'PLANE_STRAIN'
-            self.constraint = 'PLANE_STRESS'
-            
-            self.E_min = 20e4
-            self.E = 40e4 # will be added to self.E_min
-            self.nu = 0.18
-            
-            self.mat_type = 'gdm' # always
-            self.damage_law = 'exp'
-            # self.damage_law = 'perfect'
-            # self.damage_law = 'linear'
-            
-            self.e0_min = 10e-4
-            self.e0 = 1e-4 # will be added to self.e0_min
-            
-            self.ef_min = 0.
-            self.ef = 30e-4
-            
-            self.alpha = 0.99
-            
-            self.c_min = 10
-            self.c = 10 # will be added to self.c_min
-            
-            self.el_family = 'Lagrange'
-            self.shF_degree_u = 1
-            self.shF_degree_ebar = 1
-            self.integ_degree = 2
-            
-            self.softenned_pars = ('E', 'e0', 'ef', 'c')
-                # Parameters to be converted from/to FEniCS constant (to be modified more easily)
-            
-            self._write_files = True
-            
-            self.f = None # No body force
-            
-            self.analytical_jac = False # whether 'preparation' is done for analytical computation of Jacobian
-            
-        else: # Get from a dictionary
-            ParsBase.__init__(self, **kwargs)
-
 class QSModelGDM(QuasiStaticModel):
     def __init__(self, pars, struct, _path=None, _name=None \
                  , penalty_dofs=[], penalty_weight=0.):

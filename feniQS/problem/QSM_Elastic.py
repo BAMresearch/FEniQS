@@ -15,37 +15,6 @@ def get_QSM_Elastic(pars_struct, cls_struct, pars_elastic, _path=None, _name=Non
     struct = cls_struct(pars_struct, _path=_path, _name=_name)
     return QSModelElastic(pars=pars_elastic, struct=struct, _path=_path, _name=_name)
 
-class ElasticPars(ParsBase):
-    def __init__(self, pars0=None, **kwargs):
-        ParsBase.__init__(self, pars0) # pars0 :: ParsBoxCompressed(ParsBase)
-        if len(kwargs)==0: # Default values are set
-            # self.constraint = 'UNIAXIAL'
-            # self.constraint = 'PLANE_STRAIN'
-            self.constraint     = '3D'
-            
-            self.E_min          = 1e5
-            self.E              = 1e5 #40e4 # will be added to self.E_min
-            self.nu             = 0.3
-            
-            self.mat_type       = 'elastic'
-            self.damage_law     = 'exp'
-            
-            self.el_family      = 'Lagrange'
-            self.shF_degree_u   = 1
-            self.integ_degree   = 2
-            
-            self.softenned_pars = ['E']
-                # Parameters to be converted from/to FEniCS constant (to be modified more easily)
-            
-            self._write_files = True
-            
-            self.f = None # No body force
-            
-            self.analytical_jac = False # whether 'preparation' is done for analytical computation of Jacobian
-            
-        else: # Get from a dictionary
-            ParsBase.__init__(self, **kwargs)
-
 class QSModelElastic(QuasiStaticModel):
     def __init__(self, pars, struct, _path=None, _name=None):
         if isinstance(pars, dict):
