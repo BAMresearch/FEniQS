@@ -71,7 +71,7 @@ class QuasiStaticModel:
         super().__setattr__(name, value) # standard self.name=value
         if name=='_path': # If we change the path, we then update the logger, accordingly.
             if self._path is None:
-                self._path = './problems/MODELs/' + self._name + '/'
+                self._path = './QS_MODELs/' + self._name + '/'
             self._make_logger_and_path()
         elif name=='penalty_dofs' and hasattr(self, 'fen'):
             self.fen.penalty_dofs = value

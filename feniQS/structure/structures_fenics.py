@@ -13,7 +13,7 @@ class StructureFEniCS():
         if isinstance(pars, dict):
             pars = ParsBase(**pars)
         if _path is None:
-            _path = './problems/STRUCTUREs/' + _name + '/'
+            _path = './STRUCTUREs/' + _name + '/'
         self.pars = pars
         self._path = _path
         self._name = _name
