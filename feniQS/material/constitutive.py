@@ -100,12 +100,15 @@ class ElasticConstitutive():
                         [0, 0, 0, 0, _fact * self.mu, 0],
                         [0, 0, 0, 0, 0, _fact * self.mu],
                     ])
-    def sigma(self, u, K=None):
-        eps_u = epsilon(u, self.dim)
+    
+    def sigma_of_eps(self, eps, K=None):
         if self.ss_dim == 1:
-            return self.E * eps_u
+            return self.E * eps
         else:
-            return self.lamda * df.tr(eps_u) * df.Identity(self.dim) + 2 * self.mu * eps_u
+            return self.lamda * df.tr(eps) * df.Identity(self.dim) + 2 * self.mu * eps
+    
+    def sigma(self, u, K=None):
+        return self.sigma_of_eps(eps=epsilon(u, self.dim), K=K)
 
 class GradientDamageConstitutive(ElasticConstitutive):
     
@@ -129,13 +132,12 @@ class GradientDamageConstitutive(ElasticConstitutive):
         ### IMPORTANT: The "self.fn_eps_eq" method must get a "eps_3d" as its input argument
         
         self.epsilon_eq_num = epsilon_eq_num # a callable with argument of epsilon (of type numpy), which returns the equivalent strain and its derivative w.r.t. the given epsilon.
-
-    def sigma(self, u, K):
-        eps_u = epsilon(u, self.dim)
+    
+    def sigma_of_eps(self, eps, K):
         if self.ss_dim == 1:
-            return (1 - self.gK.g(K)) * self.E * eps_u
+            return (1 - self.gK.g(K)) * self.E * eps
         else:
-            return (1 - self.gK.g(K)) * (self.lamda * df.tr(eps_u) * df.Identity(self.dim) + 2 * self.mu * eps_u)
+            return (1 - self.gK.g(K)) * (self.lamda * df.tr(eps) * df.Identity(self.dim) + 2 * self.mu * eps)
         
     def d_sigma_d_D(self, u, K):
         eps_u = epsilon(u, self.dim)
