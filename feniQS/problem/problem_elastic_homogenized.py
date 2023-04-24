@@ -17,7 +17,7 @@ class ParsHomogenization(ParsBase):
         ParsBase.__init__(self, pars0)
         if len(kwargs)==0: # Default values
             self.hom_type = None # either 'Dirichlet' or 'Periodic'
-            print(f"WARNING: Homogenization parameters are None.")
+            print(f"WARNING: Homogenization type isn't yet specified.")
         else: # Get from a dictionary
             ParsBase.__init__(self, **kwargs)
 
@@ -46,6 +46,42 @@ def build_homogenization_problem(mesh, pars_hom, **kwargs):
         raise ValueError(f"The type pf homogenization is not recognized. Possible options are 'Dirichlet' and 'Periodic'.")
     
     return hom_problem
+
+def estimate_RVE_volume(mesh):
+    """
+    Given a mesh and fitting its domain into a rectangle/box (as for 2D/3D geometry),
+    this method returns:
+        RVE_volume: the area/volume of that rectangle/box (as an estimation for the RVE's volume)
+    """
+    geo_dim = mesh.geometric_dimension()
+    cs = mesh.coordinates()
+    RVE_volume = 1.
+    for i in range(geo_dim):
+        a1, a2 = np.min(cs[:,i]), np.max(cs[:,i])
+        RVE_volume *= abs(a1-a2)
+    return RVE_volume
+
+def get_RVE_boundaries(mesh):
+    """
+    Given a mesh and fitting its domain into a rectangle/box (as for 2D/3D geometry),
+    this method returns:
+        RVE_boundaries: a callable representing the exterior boarders of that rectangle/box
+        , which is then used for setting a Dirichlet BC related to the boundaries of RVE.
+    """
+    geo_dim = mesh.geometric_dimension()
+    cs = mesh.coordinates()
+    X12 = [] # min and max of coordinates per each (possible) direction
+    for i in range(geo_dim):
+        X12.append([np.min(cs[:,i]), np.max(cs[:,i])])
+    tol = mesh.rmin() / 1000.
+    def RVE_boundaries(x, on_boundary):
+        b = False
+        i = 0
+        while (not b) and (i<geo_dim):
+            b = b or df.near(x[i], X12[i][0], tol) or df.near(x[i], X12[i][1], tol)
+            i += 1
+        return b
+    return RVE_boundaries
 
 def get_macro_strain_voigt(dim, case, strain_scalar):
     """
