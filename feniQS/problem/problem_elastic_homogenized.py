@@ -16,7 +16,6 @@ class ParsHomogenization(ParsBase):
         """
         ParsBase.__init__(self, pars0)
         if len(kwargs)==0: # Default values
-            self.RVE_volume = None
             self.hom_type = None # either 'Dirichlet' or 'Periodic'
             print(f"WARNING: Homogenization parameters are None.")
         else: # Get from a dictionary
@@ -26,18 +25,19 @@ def build_homogenization_problem(mesh, pars_hom, **kwargs):
     assert isinstance(pars_hom, ParsHomogenization)
     if pars_hom.mat_type.lower() != 'elastic':
         raise ValueError(f"Homogenization problem is only implemented for an elastic material model.")
-    if pars_hom.RVE_volume is None:
-        raise ValueError(f"The volume of the RVE being homogenized must be specified.")
     if pars_hom.hom_type is None:
         raise ValueError(f"The type pf homogenization is not specified. Set it to either 'Dirichlet' or 'Periodic'.")
-    
+    try:
+        RVE_volume = kwargs['RVE_volume']
+    except KeyError:
+        raise KeyError(f"For a homogenization problem, the 'RVE_volume' must be given as input.")
     if 'dirichlet' in pars_hom.hom_type.lower():
         try:
             RVE_boundaries = kwargs['RVE_boundaries']
         except KeyError:
-            raise KeyError(f"For Dirichlet homogenization, 'RVE_boundaries' must be given as input.")
+            raise KeyError(f"For Dirichlet homogenization, the 'RVE_boundaries' must be given as input.")
         mat = ElasticConstitutive(E=pars_hom.E+pars_hom.E_min, nu=pars_hom.nu, constraint=pars_hom.constraint)
-        hom_problem = HomogenizationElasticDirichlet(mat=mat, mesh=mesh, fen_config=pars_hom, RVE_volume=pars_hom.RVE_volume)
+        hom_problem = HomogenizationElasticDirichlet(mat=mat, mesh=mesh, fen_config=pars_hom, RVE_volume=RVE_volume)
         hom_problem.build_variational_functionals(f=pars_hom.f, integ_degree=pars_hom.integ_degree)
         hom_problem.build_DirichletBC(RVE_boundaries)
     elif 'periodic' in pars_hom.hom_type.lower():
