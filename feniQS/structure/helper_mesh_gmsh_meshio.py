@@ -92,12 +92,12 @@ def gmshAPI_generate_bcc_lattice(r_strut      = 0.5,
     geo = gmsh.model.occ
     
     ### CREATE SINGLE RVE OF BCC ##############################################
-    geo.add_cylinder(0.0,   0.0,    0.0,   l_rve,   l_rve,  l_rve,  r_strut, 1)
-    geo.add_cylinder(l_rve, 0.0,    0.0,   -l_rve,  l_rve,  l_rve,  r_strut, 2)
-    geo.add_cylinder(0.0,   l_rve,  0.0,   l_rve,   -l_rve, l_rve,  r_strut, 3)
-    geo.add_cylinder(0.0,   0.0,    l_rve, l_rve,   l_rve,  -l_rve, r_strut, 4)
+    geo.addCylinder(0.0,   0.0,    0.0,   l_rve,   l_rve,  l_rve,  r_strut, 1)
+    geo.addCylinder(l_rve, 0.0,    0.0,   -l_rve,  l_rve,  l_rve,  r_strut, 2)
+    geo.addCylinder(0.0,   l_rve,  0.0,   l_rve,   -l_rve, l_rve,  r_strut, 3)
+    geo.addCylinder(0.0,   0.0,    l_rve, l_rve,   l_rve,  -l_rve, r_strut, 4)
     geo.fuse([(3, 2), (3, 3), (3, 4)], [(3, 1)], 5)
-    geo.add_box(0.0, 0.0, 0.0, l_rve, l_rve, l_rve, 6)
+    geo.addBox(0.0, 0.0, 0.0, l_rve, l_rve, l_rve, 6)
     geo.intersect([(3, 6)], [(3, 5)], 7)
     c = 7
     
@@ -116,8 +116,8 @@ def gmshAPI_generate_bcc_lattice(r_strut      = 0.5,
     if add_plates == True:
         l_mll = n_rve * l_rve
         h_plate = 0.4
-        geo.add_box(0.0,    0.0,    0.0,    l_mll,   l_mll,  -h_plate,  100)
-        geo.add_box(0.0,    0.0,    l_mll,  l_mll,   l_mll,  h_plate,   101)
+        geo.addBox(0.0,    0.0,    0.0,    l_mll,   l_mll,  -h_plate,  100)
+        geo.addBox(0.0,    0.0,    l_mll,  l_mll,   l_mll,  h_plate,   101)
         geo.fuse([(3, c)], [(3, 100), (3, 101)])
     
     ### CREATE MESH AND WRITE FILEs ########################################
@@ -184,36 +184,36 @@ def gmshAPI_notched_rectangle_mesh(lx, ly, l_notch, h_notch, c_notch=None \
     
     ## POINTs ##
     shift_notch = 1; b_notch = False
-    ps_tags.append(_this.add_point(-l_notch/2. + c_notch, 0, 0))
+    ps_tags.append(_this.addPoint(-l_notch/2. + c_notch, 0, 0))
     if abs(l_notch) > lx * 1e-8: # We have notch
-        ps_tags.append(_this.add_point(-l_notch/2. + c_notch, h_notch, 0))
-        ps_tags.append(_this.add_point(l_notch/2. + c_notch, h_notch, 0))
-        ps_tags.append(_this.add_point(l_notch/2. + c_notch, 0, 0))
+        ps_tags.append(_this.addPoint(-l_notch/2. + c_notch, h_notch, 0))
+        ps_tags.append(_this.addPoint(l_notch/2. + c_notch, h_notch, 0))
+        ps_tags.append(_this.addPoint(l_notch/2. + c_notch, 0, 0))
         shift_notch = 4; b_notch = True
     shift = 0
     xx1 = right_sup - right_sup_w / 2.
     xx2 = xx1 + right_sup_w
     if xx1!=lx:
-        ps_tags.append(_this.add_point(xx1, 0, 0))
+        ps_tags.append(_this.addPoint(xx1, 0, 0))
         shift += 1
     if xx2!=lx and xx2!=xx1:
-        ps_tags.append(_this.add_point(xx2, 0, 0))
+        ps_tags.append(_this.addPoint(xx2, 0, 0))
         shift += 1
-    ps_tags.append(_this.add_point(lx, 0, 0))
-    ps_tags.append(_this.add_point(lx, ly, 0))
-    ps_tags.append(_this.add_point(load_Xrange[1], ly, 0))
+    ps_tags.append(_this.addPoint(lx, 0, 0))
+    ps_tags.append(_this.addPoint(lx, ly, 0))
+    ps_tags.append(_this.addPoint(load_Xrange[1], ly, 0))
     if _shift_load:
-        ps_tags.append(_this.add_point(load_Xrange[0], ly, 0))
-    ps_tags.append(_this.add_point(0, ly, 0))
-    ps_tags.append(_this.add_point(0, 0, 0))
+        ps_tags.append(_this.addPoint(load_Xrange[0], ly, 0))
+    ps_tags.append(_this.addPoint(0, ly, 0))
+    ps_tags.append(_this.addPoint(0, 0, 0))
     shift_l = 0
     xx1 = left_sup - left_sup_w / 2.
     xx2 = xx1 + left_sup_w
     if xx1!=0.:
-        ps_tags.append(_this.add_point(xx1, 0, 0))
+        ps_tags.append(_this.addPoint(xx1, 0, 0))
         shift_l += 1
     if xx2!=0. and xx2!=xx1:
-        ps_tags.append(_this.add_point(xx2, 0, 0))
+        ps_tags.append(_this.addPoint(xx2, 0, 0))
         shift_l += 1
     num_ps = len(ps_tags)
     
@@ -228,18 +228,18 @@ def gmshAPI_notched_rectangle_mesh(lx, ly, l_notch, h_notch, c_notch=None \
             pz = p[2]
         except:
             pass
-        embedded_ps_tags.append(_this.add_point(p[0], py, pz))
+        embedded_ps_tags.append(_this.addPoint(p[0], py, pz))
     
     ## LINEs ##
     for it in range(num_ps - 1):
-        ls_tags.append(_this.add_line(ps_tags[it], ps_tags[it+1]))
-    ls_tags.append(_this.add_line(ps_tags[-1], ps_tags[0]))
+        ls_tags.append(_this.addLine(ps_tags[it], ps_tags[it+1]))
+    ls_tags.append(_this.addLine(ps_tags[-1], ps_tags[0]))
     
     ## CURVEs (looped) ##
-    curve_tags.append(_this.add_curve_loop(ls_tags))
+    curve_tags.append(_this.addCurveLoop(ls_tags))
     
     ## SURFACEs (PLANEs) ##
-    plane_tags.append(_this.add_plane_surface(curve_tags))
+    plane_tags.append(_this.addPlaneSurface(curve_tags))
     
     ## MESH RESULUTIONs ##
     # Set coefficients
@@ -288,34 +288,34 @@ def gmshAPI_notched_rectangle_mesh(lx, ly, l_notch, h_notch, c_notch=None \
     # Set resolutions
     A = gmsh.model.mesh
     _this.synchronize() # Crucial to first call 'synchronize'.
-    phy_g = gmsh.model.add_physical_group(geo_dim, plane_tags)
+    phy_g = gmsh.model.addPhysicalGroup(geo_dim, plane_tags)
     
     if b_notch:
         # Notch hight
-        A.set_transfinite_curve(ls_tags[0], n_h_notch+1, coef=1)
-        A.set_transfinite_curve(ls_tags[2], n_h_notch+1, coef=1)
+        A.setTransfiniteCurve(ls_tags[0], n_h_notch+1, coef=1)
+        A.setTransfiniteCurve(ls_tags[2], n_h_notch+1, coef=1)
         # Notch width (length)
-        A.set_transfinite_curve(ls_tags[1], n_l_notch+1, coef=1)
+        A.setTransfiniteCurve(ls_tags[1], n_l_notch+1, coef=1)
     # Top
-    A.set_transfinite_curve(ls_tags[1+shift_notch+shift], n_top_right+1, coef=r_top_right)
+    A.setTransfiniteCurve(ls_tags[1+shift_notch+shift], n_top_right+1, coef=r_top_right)
     if _shift_load:
-        A.set_transfinite_curve(ls_tags[1+shift_notch+shift+_shift_load], n_load_range+1, coef=1, meshType='Bump') # Bump means concentrating elements in the middle.
-    A.set_transfinite_curve(ls_tags[2+shift_notch+shift+_shift_load], n_top_left+1, coef=-r_top_left)
+        A.setTransfiniteCurve(ls_tags[1+shift_notch+shift+_shift_load], n_load_range+1, coef=1, meshType='Bump') # Bump means concentrating elements in the middle.
+    A.setTransfiniteCurve(ls_tags[2+shift_notch+shift+_shift_load], n_top_left+1, coef=-r_top_left)
     # Sides
-    A.set_transfinite_curve(ls_tags[shift_notch+shift], res_y+1, coef=1)
-    A.set_transfinite_curve(ls_tags[3+shift_notch+shift+_shift_load], res_y+1, coef=1)
+    A.setTransfiniteCurve(ls_tags[shift_notch+shift], res_y+1, coef=1)
+    A.setTransfiniteCurve(ls_tags[3+shift_notch+shift+_shift_load], res_y+1, coef=1)
     # Bottom-right
-    A.set_transfinite_curve(ls_tags[shift_notch-1], n_r3+1, coef=-r_r3)
+    A.setTransfiniteCurve(ls_tags[shift_notch-1], n_r3+1, coef=-r_r3)
     if r2!=0.:
-        A.set_transfinite_curve(ls_tags[shift_notch], n_r2+1, coef=-r_r2)
+        A.setTransfiniteCurve(ls_tags[shift_notch], n_r2+1, coef=-r_r2)
     if r1!=0.:
-        A.set_transfinite_curve(ls_tags[shift_notch-1+shift], n_r1+1, coef=-r_r1)
+        A.setTransfiniteCurve(ls_tags[shift_notch-1+shift], n_r1+1, coef=-r_r1)
     ## Bottom-left
     if l1!=0.:
-        A.set_transfinite_curve(ls_tags[4+shift_notch+shift+_shift_load], n_l1+1, coef=r_l1)
+        A.setTransfiniteCurve(ls_tags[4+shift_notch+shift+_shift_load], n_l1+1, coef=r_l1)
     if l2!=0.:
-        A.set_transfinite_curve(ls_tags[4+shift_notch+shift+_shift_load+shift_l-1], n_l2+1, coef=r_l2)
-    A.set_transfinite_curve(ls_tags[4+shift_notch+shift+_shift_load+shift_l], n_l3+1, coef=r_l3)
+        A.setTransfiniteCurve(ls_tags[4+shift_notch+shift+_shift_load+shift_l-1], n_l2+1, coef=r_l2)
+    A.setTransfiniteCurve(ls_tags[4+shift_notch+shift+_shift_load+shift_l], n_l3+1, coef=r_l3)
     
     if el_size_max is not None:
         gmsh.option.setNumber("Mesh.CharacteristicLengthMax", el_size_max)
@@ -353,21 +353,21 @@ def gmshAPI_notched_rectangle_mesh(lx, ly, l_notch, h_notch, c_notch=None \
         tag_f_thrs = [] # list of tags of all threshold fields
         for ip in range(len(embedded_ps_tags)):
             tag_f_d = A2.add('Distance')
-            A2.set_numbers(tag_f_d, 'PointsList', [embedded_ps_tags[ip]])
+            A2.setNumbers(tag_f_d, 'PointsList', [embedded_ps_tags[ip]])
             # Each threshold field
             tag_f_thr = A2.add('Threshold')
-            A2.set_number(tag_f_thr, 'InField', tag_f_d)
-            A2.set_number(tag_f_thr, 'SizeMin', embedded_nodes_reses[ip])
-            A2.set_number(tag_f_thr, 'DistMin', embedded_nodes_min_dists[ip])
-            A2.set_number(tag_f_thr, 'SizeMax', l_sides) # the largest mesh size (at sides)
-            A2.set_number(tag_f_thr, 'DistMax', min_dist_to_sides)
+            A2.setNumber(tag_f_thr, 'InField', tag_f_d)
+            A2.setNumber(tag_f_thr, 'SizeMin', embedded_nodes_reses[ip])
+            A2.setNumber(tag_f_thr, 'DistMin', embedded_nodes_min_dists[ip])
+            A2.setNumber(tag_f_thr, 'SizeMax', l_sides) # the largest mesh size (at sides)
+            A2.setNumber(tag_f_thr, 'DistMax', min_dist_to_sides)
             tag_f_thrs.append(tag_f_thr)
         # Minimum field among all threshold fields defined above
         tag_f_min = A2.add('Min')
-        A2.set_numbers(tag_f_min, 'FieldsList', tag_f_thrs)
+        A2.setNumbers(tag_f_min, 'FieldsList', tag_f_thrs)
         
             ## Set Background mesh based on minimum field established above
-        A2.set_as_background_mesh(tag_f_min)
+        A2.setAsBackgroundMesh(tag_f_min)
         
         ### Set embedded nodes
         A.embed(0, embedded_ps_tags, geo_dim, plane_tags[0])
