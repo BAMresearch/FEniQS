@@ -1,5 +1,5 @@
 # FEniQS
-A library for simulating static/quasi-static structural mechanics problems in FEniCS, which contains the following main modules:
+A library for finite element (FE) modelling of static/quasi-static structural mechanics problems with _legacy_ [FEniCS](https://fenicsproject.org/), which contains the following main modules:
 
 **structure:**
 
