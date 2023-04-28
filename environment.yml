@@ -13,3 +13,6 @@ dependencies:
   - fenics
   - gmsh
   - python-gmsh
+  - pip
+  - pip:
+      - "--editable=git+https://github.com/BAMresearch/FEniQS.git@main#egg=feniQS"
