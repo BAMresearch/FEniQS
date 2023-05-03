@@ -1,6 +1,5 @@
 name: feniqs
 channels:
-  - anaconda
   - conda-forge
 dependencies:
   - python
@@ -9,10 +8,10 @@ dependencies:
   - seaborn
   - yaml
   - pyyaml
-  - meshio
   - fenics
-  - gmsh
+  - meshio
+  - gmsh >= 4.11
   - python-gmsh
   - pip
   - pip:
-      - "--editable=git+https://github.com/BAMresearch/FEniQS.git@main#egg=feniQS"
+      - -e .
