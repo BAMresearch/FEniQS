@@ -245,6 +245,9 @@ def gmshAPI_notched_rectangle_mesh(lx, ly, l_notch, h_notch, c_notch=None \
     # Set coefficients
     # Vertical sides
     l_sides = ly / res_y
+    if el_size_max is not None:
+        l_sides = min(l_sides, el_size_max)
+        res_y = int(ly / l_sides)
     # Top sides (and possible load_range)
     l_top_left = load_Xrange[0] - 0.
     n_top_left, r_top_left, l0_top_left = geometric_resolution_over_length(l=l_top_left, scale=scale, l0=l_sides)
@@ -332,8 +335,8 @@ def gmshAPI_notched_rectangle_mesh(lx, ly, l_notch, h_notch, c_notch=None \
             ## Desired mesh size around any embedded nodes
             # VERSION-1 (better)
         A.generate(geo_dim)
-        el_tags_of_embedded_nodes = [A.get_elements_by_coordinates(n[0], n[1], 0)[0] for n in embedded_nodes]
-        embedded_nodes_reses = (3.0 * A.get_element_qualities(el_tags_of_embedded_nodes, 'volume')) ** 0.5 # ? Not clear whhy this gives best estimation of mesh size given element volume.
+        el_tags_of_embedded_nodes = [A.getElementsByCoordinates(n[0], n[1], 0)[0] for n in embedded_nodes]
+        embedded_nodes_reses = (3.0 * A.getElementQualities(el_tags_of_embedded_nodes, 'volume')) ** 0.5 # ? Not clear whhy this gives best estimation of mesh size given element volume.
         A.clear()
             # VERSION-2 (sub-optimal)
         # factors_y = len(embedded_nodes) * [1.] # no effect of y-coordinates
