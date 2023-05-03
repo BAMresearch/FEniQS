@@ -9,6 +9,31 @@ from feniQS.general.general import *
 pth_fenics_functions = CollectPaths('fenics_functions.py')
 pth_fenics_functions.add_script(pth_general)
 
+def conditional_by_ufl(condition, f1, f2, value_true, value_false, tol=None):
+    """
+    condition: a string among the two following:
+        'lt': less than (strictly)
+        'le': less or equal
+    NOTE: The other two possiblities ('gt': greater than (strictly) and 'ge': greater or equal)
+            are simply achieved by switching the input functions f1 and f2.
+    
+    f1, f2: functions to be compared; i.e. it will be checked whether:
+        $f1$ $condition$ $f2$
+    
+    value_true, value_false: respective return value depending on whether the condition is true or not.
+    
+    tol (optional): a POSITIVE tolerance for comparison, which is added to the less (smaller) function 'f1'.
+    """
+    try:
+        ufl_condition = {'lt': df.lt, 'le': df.le}[condition]
+    except KeyError:
+        raise KeyError(f"Possible values for condition are 'lt' and 'le'. Consider switching input functions when intending the conditions 'gt' and 'ge'.")
+    _f1 = f1
+    if tol is not None:
+        _f1 = f1 + df.Constant(tol)
+    return df.conditional(ufl_condition(_f1, f2), value_true, value_false)
+
+
 def get_element_volumes(mesh):
      V = df.FunctionSpace(mesh, 'DG', 0)
      u = df.Function(V)

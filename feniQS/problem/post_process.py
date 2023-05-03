@@ -53,7 +53,7 @@ class PostProcessEvalForm:
         return f
     
 class PostProcessEvalFunc:
-    def __init__(self, func, dofs, checkpoints=[]):
+    def __init__(self, func, dofs=None, checkpoints=[]):
         """
         This calss provides a callable for getting values (vector) of a FEniCS function and appending it to an array over time.
         """
@@ -67,7 +67,9 @@ class PostProcessEvalFunc:
         if t==0.0: # initiation
             self.all = []
             self.checked = []
-        f = self.func.vector().get_local()[self.dofs]
+        f = self.func.vector().get_local()
+        if self.dofs is not None:
+            f = f[self.dofs]
         self.all.append(f)
         if self.checkpoints!=[]:
             for tt in self.checkpoints:

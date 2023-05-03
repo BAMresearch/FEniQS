@@ -146,9 +146,9 @@ class StructureFEniCS():
     
 class StructureFromMesh(StructureFEniCS):
     def __init__(self, mesh, _path=None, _name=None):
-        self.mesh = mesh
         StructureFEniCS.__init__(self, pars=None, _path=_path, _name=_name)
             # The mesh is directly given as input, so, 'pars' is useless and thus set to None.
+        self.mesh = mesh
     def _build_structure(self):
         pass # Mesh is already set.
 

@@ -6,6 +6,7 @@ from ufl import grad, nabla_grad, div, nabla_div, sym
 from feniQS.material.damage import *
 from feniQS.material.fenics_mechanics import *
 from feniQS.material.fenics_mechanics import _ss_vector
+from feniQS.fenics_helpers.fenics_functions import conditional_by_ufl
 import numpy as np
 
 """
@@ -100,15 +101,12 @@ class ElasticConstitutive():
                         [0, 0, 0, 0, _fact * self.mu, 0],
                         [0, 0, 0, 0, 0, _fact * self.mu],
                     ])
-    
-    def sigma_of_eps(self, eps, K=None):
-        if self.ss_dim == 1:
-            return self.E * eps
-        else:
-            return self.lamda * df.tr(eps) * df.Identity(self.dim) + 2 * self.mu * eps
-    
     def sigma(self, u, K=None):
-        return self.sigma_of_eps(eps=epsilon(u, self.dim), K=K)
+        eps_u = epsilon(u, self.dim)
+        if self.ss_dim == 1:
+            return self.E * eps_u
+        else:
+            return self.lamda * df.tr(eps_u) * df.Identity(self.dim) + 2 * self.mu * eps_u
 
 class GradientDamageConstitutive(ElasticConstitutive):
     
@@ -132,12 +130,13 @@ class GradientDamageConstitutive(ElasticConstitutive):
         ### IMPORTANT: The "self.fn_eps_eq" method must get a "eps_3d" as its input argument
         
         self.epsilon_eq_num = epsilon_eq_num # a callable with argument of epsilon (of type numpy), which returns the equivalent strain and its derivative w.r.t. the given epsilon.
-    
-    def sigma_of_eps(self, eps, K):
+
+    def sigma(self, u, K):
+        eps_u = epsilon(u, self.dim)
         if self.ss_dim == 1:
-            return (1 - self.gK.g(K)) * self.E * eps
+            return (1 - self.gK.g(K)) * self.E * eps_u
         else:
-            return (1 - self.gK.g(K)) * (self.lamda * df.tr(eps) * df.Identity(self.dim) + 2 * self.mu * eps)
+            return (1 - self.gK.g(K)) * (self.lamda * df.tr(eps_u) * df.Identity(self.dim) + 2 * self.mu * eps_u)
         
     def d_sigma_d_D(self, u, K):
         eps_u = epsilon(u, self.dim)
@@ -167,17 +166,15 @@ class GradientDamageConstitutive(ElasticConstitutive):
         "K_old" and "ebar" are both FEniCS functions.
         This basically returns maximum of the two functions.
         """
-        # ## WAY 1 (using ufl.conditional)
-        # condition = ufl.le(K_old, ebar)
-        # true_value = ebar
-        # false_value = K_old
-        # return ufl.conditional(condition, true_value, false_value)
+        ## WAY 1 (using ufl.conditional) # Not working due to the input 'ebar' being IndexFunction
+        # return conditional_by_ufl(condition='le', f1=ebar, f2=K_old \
+        #                           , value_true=K_old, value_false=ebar)
         
         ## WAY 2 (using ufl.operators.Max)
         return ufl.operators.Max(K_old, ebar)
         
-        # ## WAY 3 (using direct algebraic calculation)
-        # return (K_old + ebar + ufl.algebra.Abs(K_old - ebar)) / Constant(2)
+        ## WAY 3 (using direct algebraic calculation)
+        # return (K_old + ebar + ufl.algebra.Abs(K_old - ebar)) / df.Constant(2.)
         
         ## WAY 4 (vector-based) (Completely different)
         # K_old_vec = K_old.vector().get_local()
@@ -189,7 +186,5 @@ class GradientDamageConstitutive(ElasticConstitutive):
         
     def d_K_d_K_old(K_old, ebar):
         ## WAY 1 (using ufl.conditional)
-        condition = ufl.ge(K_old, ebar)
-        true_value = 1
-        false_value = 0
-        return ufl.conditional(condition, true_value, false_value)
+        return conditional_by_ufl(condition='le', f1=ebar, f2=K_old \
+                                  , value_true=1., value_false=0.)

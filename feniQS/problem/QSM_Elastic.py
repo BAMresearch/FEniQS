@@ -20,9 +20,10 @@ class QSModelElastic(QuasiStaticModel):
         if isinstance(pars, dict):
             pars = ParsBase(**pars)
         ## The parameters of model might include structure parameters, thus, it must be updated accordingly.
-        for kp in pars.__dict__.keys():
-            if kp in struct.pars.__dict__.keys():
-                pars.__dict__[kp] = struct.pars.__dict__[kp]
+        if struct.pars is not None:        
+            for kp in pars.__dict__.keys():
+                if kp in struct.pars.__dict__.keys():
+                    pars.__dict__[kp] = struct.pars.__dict__[kp]
         if _name is None:
             _name = 'QsElastic_' + struct._name
         self.struct = struct

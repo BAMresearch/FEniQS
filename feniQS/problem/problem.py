@@ -195,15 +195,15 @@ class FenicsProblem():
         ## Concentrated forces using Dirac-delta approach.
         _radius = self.mesh.rmax()
         if self.dep_dim==1:
-            cfs = self.concentrated_forces['x']
-            if len(cfs)>0:
-                self.fs_concentrated = DiracDeltaExpression(radius=_radius, geo_dim=self.geo_dim)
-                for cf in cfs:
-                    _correction = self._correction_of_DiracDelta_force(cf['location'], _radius)
-                    self.fs_concentrated.add_delta(location=cf['location'], value=cf['value'] \
-                                                   , scale=cf['scale']*_correction)
-            else:
-                self.fs_concentrated = 0.
+            self.fs_concentrated = 0. # default
+            if len(self.concentrated_forces)>0:
+                cfs = self.concentrated_forces['x']
+                if len(cfs)>0:
+                    self.fs_concentrated = DiracDeltaExpression(radius=_radius, geo_dim=self.geo_dim)
+                    for cf in cfs:
+                        _correction = self._correction_of_DiracDelta_force(cf['location'], _radius)
+                        self.fs_concentrated.add_delta(location=cf['location'], value=cf['value'] \
+                                                    , scale=cf['scale']*_correction)
         else:
             _f = self.dep_dim * [0.]
             for direction, cfs in self.concentrated_forces.items():
@@ -233,9 +233,18 @@ class FenicsProblem():
         for l in self.time_varying_loadings:
             l.t = t
         
-    def _todo_after_convergence(self):
+    def _todo_after_convergence(self, verify_free_residual=False):
         # IMPORTANT: This method MUST be called only if the convergence is met)
         self._assemble_K_t()
+        if verify_free_residual:
+            # Check if the residual at free DOFs is close to zero (according to the absolute tolerance of the solver)
+            res_abs_threshold = 1e-8 # an acceptable threshold
+            all_bcs_dofs = self.bcs_DR_dofs + self.bcs_DR_inhom_dofs
+            free_dofs = [i for i in range(self.get_i_full().dim()) if i not in all_bcs_dofs]
+            res_free = df.assemble(self.get_F_and_u()[0]).get_local()[free_dofs]
+            err = np.linalg.norm(res_free)
+            if err > res_abs_threshold:
+                print(f"\n--- WARNING (CONVERGENCE VERIFIED) ---\n\tThe absolute tolerance reached is {err:.2e} .")
     
     def get_i_full(self):
         # to get the full function space of the problem.
@@ -415,6 +424,10 @@ class FenicsElastic(FenicsProblem):
         self.u_u.vector()[:] = u0
 
 class FenicsGradientDamage(FenicsProblem, df.NonlinearProblem):
+    import warnings
+    from ffc.quadrature.deprecation import QuadratureRepresentationDeprecationWarning
+    warnings.simplefilter("ignore", QuadratureRepresentationDeprecationWarning)
+
     def __init__(self, mat, mesh, fen_config, dep_dim=None \
                  , penalty_dofs=[], penalty_weight=df.Constant(0.) \
                      , K_current=df.Constant(0.0), jac_prep=False):
@@ -434,9 +447,14 @@ class FenicsGradientDamage(FenicsProblem, df.NonlinearProblem):
         self.ebar_residual_weight = df.Constant((ebar_residual_weight))
             # To make residual vector of nonlocal-field (ebar) comparable to residual vetor of displacement field.
         
-        if self.hist_storage == 'quadrature':
-            if integ_degree is None: # the default integration is not suitable, since it might have different number of integration points than our self.u_K_current
-                integ_degree = max(self.shF_degree_u, self.shF_degree_ebar) + 1 # set a value for it
+        if self.hist_storage=='quadrature':
+            if integ_degree is None:
+                # In this case, the 'default' integration degree (see the superclass) might cause inconsistency
+                # , since it can internally allocate a different number of integration points than the space
+                # behind internal variables ('self.i_K' as will be specified in self.discretize). So, we have to
+                # specify a certain value for integ_degree, which is then used - in a consistent way - for both 
+                # defining 'self.i_K' and performing the integration.
+                integ_degree = max(self.shF_degree_u, self.shF_degree_ebar) + 1
         
         f = FenicsProblem.build_variational_functionals(self, f, integ_degree) # includes discritization
         
@@ -507,7 +525,7 @@ class FenicsGradientDamage(FenicsProblem, df.NonlinearProblem):
             e_K = df.FiniteElement(family="Quadrature", cell=self.mesh.ufl_cell(), \
                                    degree=self.integ_degree, quad_scheme="default")
             self.i_K = df.FunctionSpace(self.mesh, e_K)
-        elif self.hist_storage=='ebar': # uses the same interpolation as for "ebar"
+        else: # uses the same interpolation as for "ebar"
             self.i_K = self.i_mix.sub(1).collapse() # "collapse()" is needed for operations related to projection/interpolation.
         self.u_K_current = df.interpolate(self.K_current, self.i_K)
     
@@ -591,7 +609,7 @@ class FenicsGradientDamage(FenicsProblem, df.NonlinearProblem):
         if _collapse:
             iu = iu.collapse()
         return iu
-    
+
     def _todo_after_convergence(self):
         FenicsProblem._todo_after_convergence(self)
         if self.jac_prep:
@@ -612,14 +630,22 @@ class FenicsGradientDamage(FenicsProblem, df.NonlinearProblem):
         ### WAY 1: entry-wise maximization (given from Thomas on: https://git.bam.de/mechanics/ttitsche/fenics_snippets/-/blob/master/gdm/gdm.py#L152)
         k = self.u_K_current.vector().get_local()
         if self.hist_storage=='quadrature':
-            ebar = self.u_mix.split()[1]
+            ebar = self.u_mix.split(deepcopy=True)[1]
+            
+            # WAY-1-1: Interpolation to self.i_K space
             e = df.interpolate(ebar, self.i_K).vector().get_local()
-        elif self.hist_storage=='ebar': # uses the same interpolation as for "ebar"
+
+            # WAY-1-2: Projection to self.i_K space
+            # if self.integ_degree>1:
+            #     df.parameters["form_compiler"]["representation"] = "quadrature"
+            # e = df.project(ebar, self.i_K).vector().get_local()
+            # df.parameters["form_compiler"]["representation"] = "uflacs"
+        else:
             ebar = self.u_mix.split(deepcopy=True)[1] # deepcopy is necessary in order to get the function's vector() only over the subspace dimension
             e = ebar.vector().get_local()
         self.u_K_current.vector().set_local(np.maximum(k, e))
         
-        # ### WAY 2: projection/interpolation based on "new K" as a "ufl" object
+        ### WAY 2: projection/interpolation based on "new K" as a "ufl" object
         # u_K_current_new = GradientDamageConstitutive.update_K(self.u_K_current, self.u_ebar) # based on the second field (u_ebar)
         #   # For being called in the following "assign" method, we must project it first :
         # if self.hist_storage=='quadrature':
@@ -628,9 +654,9 @@ class FenicsGradientDamage(FenicsProblem, df.NonlinearProblem):
         #     u_K_current_new = df.project(u_K_current_new, self.i_K, \
         #                                    form_compiler_parameters={"quadrature_degree":self.integ_degree})
         #     df.parameters["form_compiler"]["representation"] = "uflacs"
-        # elif self.hist_storage=='ebar':
+        # else:
         #     u_K_current_new = df.project(u_K_current_new, self.i_K)
-        # self.u_K_current.assign(u_K_current_new)
+        # self.u_K_current.vector().set_local(u_K_current_new.vector().get_local())
     
     def reset_fields(self, u0=None, ebar0=None, K0=0.0):
         # u0 and ebar0 can be vectors of the same length as self.u_u and self.u_ebar
@@ -677,12 +703,9 @@ class FenicsGradientDamage(FenicsProblem, df.NonlinearProblem):
             return self.dF_dps[_name]
     
     def _assign_dF_dK0(self):
-        import warnings
-        from ffc.quadrature.deprecation import QuadratureRepresentationDeprecationWarning
-        warnings.simplefilter("ignore", QuadratureRepresentationDeprecationWarning)
         if self.integ_degree>1:
             df.parameters["form_compiler"]["representation"] = "quadrature"
-        self.dF_dK0[:][:] = df.assemble(self.dF_dK0_form).array() # to modify
+        self.dF_dK0 = df.assemble(self.dF_dK0_form).array()
         df.parameters["form_compiler"]["representation"] = "uflacs"
         
     def _set_dF_dK0(self, u_Kmax, expr_sigma_scale):
@@ -699,16 +722,10 @@ class FenicsGradientDamage(FenicsProblem, df.NonlinearProblem):
         # self.dF_dK0_form = df.inner(dD_dKmax * dKmax_dK0 * K_trial * dF_dsigma, dsigma_dD) * self.dxm
         
         ## WAY 2) (only working for integ_degree=1)
-        # self.dF_dK0_form = df.derivative(self.F_u + self.F_ebar, self.u_K_current)
+        # self.dF_dK0_form = df.derivative(self.get_F_and_u()[0], self.u_K_current)
         
         ## initiate the assembled "self.dF_dK0"
-        import warnings
-        from ffc.quadrature.deprecation import QuadratureRepresentationDeprecationWarning
-        warnings.simplefilter("ignore", QuadratureRepresentationDeprecationWarning)
-        if self.integ_degree>1:
-            df.parameters["form_compiler"]["representation"] = "quadrature"
-        self.dF_dK0 = df.assemble(self.dF_dK0_form).array() # to initiate
-        df.parameters["form_compiler"]["representation"] = "uflacs"
+        self._assign_dF_dK0()
         
     def _assign_dKmax_dK0(self):
         """

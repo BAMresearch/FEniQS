@@ -7,7 +7,9 @@ import dolfin as df
 import ufl
 
 from feniQS.general.general import CollectPaths
+from feniQS.fenics_helpers.fenics_functions import conditional_by_ufl, pth_fenics_functions
 pth_damage = CollectPaths('damage.py')
+pth_damage.add_script(pth_fenics_functions)
 
 class GKLocalDamageLinear: ### Developed now for numpy usage (NOT dolfin Ufl)
     """
@@ -22,8 +24,10 @@ class GKLocalDamageLinear: ### Developed now for numpy usage (NOT dolfin Ufl)
         self._fact = self.ku / (self.ku - self.ko) # as a helper value
     
     def g(self, K):
-        condition = df.le(K, self.ko)
-        return df.conditional(condition, 0, self._fact * (1.0 - self.ko / K))
+        vt = 0.
+        vf = self._fact * (1.0 - self.ko / K)
+        return conditional_by_ufl(condition='le', f1=K, f2=self.ko \
+                                  , value_true=vt, value_false=vf)
     
     def g_eval(self, K_val):
         if K_val <= self.ko:
@@ -54,13 +58,16 @@ class GKLocalDamageExponential:
         self.ef = ef
         
     def g(self, K):
-        condition = df.le(K, self.e0)
-        return df.conditional(condition, 0, 1 - self.e0 * (1 - self.alpha + self.alpha * df.exp((self.e0 - K) / self.ef)) / K)
+        vt = 0.
+        vf = 1 - self.e0 * (1 - self.alpha + self.alpha * df.exp((self.e0 - K) / self.ef)) / K
+        return conditional_by_ufl(condition='le', f1=K, f2=self.e0 \
+                                  , value_true=vt, value_false=vf)
     
     def dg_dK(self, K):
-        condition = df.le(K, self.e0)
-        val = self.e0 / K * ((1.0 / K + 1.0/self.ef) * self.alpha * df.exp((self.e0 - K) / self.ef) + (1.0 - self.alpha) / K)
-        return df.conditional(condition, 0, val)
+        vt = 0.
+        vf = self.e0 / K * ((1.0 / K + 1.0/self.ef) * self.alpha * df.exp((self.e0 - K) / self.ef) + (1.0 - self.alpha) / K)
+        return conditional_by_ufl(condition='le', f1=K, f2=self.e0 \
+                                  , value_true=vt, value_false=vf)
     
     def g_eval(self, K_val):
         """
@@ -146,12 +153,16 @@ class GKLocalDamagePerfect:
         self.K0 = K0
 
     def g(self, K):
-        condition = df.le(K, self.K0)
-        return df.conditional(condition, 0, 1 - self.K0 / K)
+        vt = 0.
+        vf = 1. - self.K0 / K
+        return conditional_by_ufl(condition='le', f1=K, f2=self.K0 \
+                                  , value_true=vt, value_false=vf)
     
     def dg_dK(self, K):
-        condition = df.le(K, self.K0)
-        return df.conditional(condition, 0, self.K0 / (K*K))
+        vt = 0.
+        vf = self.K0 / (K*K)
+        return conditional_by_ufl(condition='le', f1=K, f2=self.K0 \
+                                  , value_true=vt, value_false=vf)
     
     def g_eval(self, K_val):
         """
