@@ -77,7 +77,6 @@ class ParsBend3Point2D(ParsBase):
             (to be hashable and able to be writtin/read to/from yaml file)
         """
         pars.resolutions['embedded_nodes'] = tuple(tuple(float(c) for c in p) for p in embedded_nodes)
-            # Must be converted to tuple and float (to be hashable)
             # Can this be done via setattr and getattr methods (as we here change value of a dictionary) ?
     
     @staticmethod

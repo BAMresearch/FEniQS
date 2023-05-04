@@ -6,7 +6,7 @@ from feniQS.structure.structures_fenics import *
 from feniQS.fenics_helpers.fenics_functions import *
 from feniQS.structure.helper_loadings import *
 
-pth_struct_rectangle2d = CollectPaths('struct_rectangle2d.py')
+pth_struct_rectangle2d = CollectPaths('struct_rectangle2D.py')
 pth_struct_rectangle2d.add_script(pth_structures_fenics)
 pth_struct_rectangle2d.add_script(pth_fenics_functions)
 pth_struct_rectangle2d.add_script(pth_helper_loadings)
