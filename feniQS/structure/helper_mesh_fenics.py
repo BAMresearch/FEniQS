@@ -19,6 +19,28 @@ def bcc_mesh_parametric(r_strut, l_rve, n_rve, l_cell, add_plates=True, shape_na
         ff.read(mesh)
     return mesh
 
+def slab2D_mesh(lx, ly, res_x, res_y, embedded_nodes, _path, _name='slab2D'):
+    ## Use Gmsh-API and meshio
+    ff_msh = gmshAPI_slab2D_mesh(lx=lx, ly=ly, res_x=res_x, res_y=res_y \
+                                 , embedded_nodes=embedded_nodes, _path=_path, _name=_name)
+    ff_xdmf = meshio_get_xdmf_from_msh(ff_msh, path_xdmf=_path, f_xdmf=_name+'.xdmf', geo_dim=2)
+    mesh = df.Mesh()
+    with df.XDMFFile(ff_xdmf) as ff:
+        ff.read(mesh)
+    
+    ##### CRUCIAL #####
+    # We modify values of the given embedded_nodes to the exact nodal coordinates of the generated mesh.
+    # ---> Some veryyyy small deviation can emerge after calling methods 'gmshAPI_notched_rectangle_mesh'
+    #      and 'meshio_get_xdmf_from_msh' and reading XDMF file to a FEniCS mesh.
+    #      Such deviation might cause issue: A given embedded node might get outside of the generated FEniCS mesh !
+    tol = mesh.rmin() / 1000.
+    for ie, ce in enumerate(embedded_nodes):
+        for cm in mesh.coordinates():
+            if np.linalg.norm(ce - cm) < tol:
+                embedded_nodes[ie, :] = cm[:]
+    
+    return mesh
+
 def notched_rectangle_mesh(lx, ly, l_notch, h_notch, c_notch=None \
                            , load_Xrange=None, left_sup=None, right_sup=None, left_sup_w=0., right_sup_w=0. \
                            , res_y=3, scale=0.5, embedded_nodes=[], el_size_min=None, el_size_max=None \

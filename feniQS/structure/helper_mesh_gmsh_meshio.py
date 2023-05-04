@@ -129,6 +129,80 @@ def gmshAPI_generate_bcc_lattice(r_strut      = 0.5,
     
     return ff_msh
 
+def gmshAPI_slab2D_mesh(lx, ly, res_x, res_y, embedded_nodes \
+                        , _path='./', _name='slab2D', write_geo=False):
+    ## PARAMETERs
+    geo_dim = 2
+
+    ## FILEs
+    make_path(_path)
+    ff_geo = _path + '/' + _name + ".geo_unrolled" # if requested, writen after API.
+    ff_msh = _path + '/' + _name + ".msh"
+
+    ############### Gmsh API #################
+    gmsh.initialize()
+    model_tag = gmsh.model.add(_name)  # give the model a name
+    ps_tags = []
+    ls_tags = []
+    curve_tags = []
+    plane_tags = []
+
+    _this = gmsh.model.occ
+    # _this = gmsh.model.geo # Not sure, what is the difference to the above one!
+
+    ps_tags.append(_this.addPoint(0., 0., 0.))
+    ps_tags.append(_this.addPoint(lx, 0., 0.))
+    ps_tags.append(_this.addPoint(lx, ly, 0.))
+    ps_tags.append(_this.addPoint(0., ly, 0.))
+    num_ps = len(ps_tags)
+
+    embedded_ps_tags = []
+    py = 0.; pz = 0.
+    for p in embedded_nodes:
+        try:
+            py = p[1]
+        except:
+            pass    
+        try:
+            pz = p[2]
+        except:
+            pass
+        embedded_ps_tags.append(_this.addPoint(p[0], py, pz))
+    
+    ## LINEs ##
+    for it in range(num_ps - 1):
+        ls_tags.append(_this.addLine(ps_tags[it], ps_tags[it+1]))
+    ls_tags.append(_this.addLine(ps_tags[-1], ps_tags[0]))
+    
+    ## CURVEs (looped) ##
+    curve_tags.append(_this.addCurveLoop(ls_tags))
+    
+    ## SURFACEs (PLANEs) ##
+    plane_tags.append(_this.addPlaneSurface(curve_tags))
+
+    # Set resolutions
+    A = gmsh.model.mesh
+    _this.synchronize() # Crucial to first call 'synchronize'.
+    phy_g = gmsh.model.addPhysicalGroup(geo_dim, plane_tags)
+    
+    A.setTransfiniteCurve(ls_tags[0], res_x+1, coef=1)
+    A.setTransfiniteCurve(ls_tags[1], res_y+1, coef=1)
+    A.setTransfiniteCurve(ls_tags[2], res_x+1, coef=1)
+    A.setTransfiniteCurve(ls_tags[3], res_y+1, coef=1)
+
+    ## EMBEDED NODEs ##
+    if len(embedded_ps_tags)>0:
+        A.embed(0, embedded_ps_tags, geo_dim, plane_tags[0])
+    
+    ## MESHING
+    A.generate(geo_dim)
+    gmsh.write(ff_msh)
+    if write_geo:
+        gmsh.write(ff_geo)
+    gmsh.finalize()
+        
+    return ff_msh
+
 def gmshAPI_notched_rectangle_mesh(lx, ly, l_notch, h_notch, c_notch=None \
                            , load_Xrange=None, left_sup=None, right_sup=None, left_sup_w=0., right_sup_w=0. \
                            , res_y=3, scale=0.5, embedded_nodes=[], el_size_min=None, el_size_max=None \
@@ -180,7 +254,7 @@ def gmshAPI_notched_rectangle_mesh(lx, ly, l_notch, h_notch, c_notch=None \
     plane_tags = []
     
     _this = gmsh.model.occ
-    # _this = gmsh.model.geo # Not sure, whet is the difference to the above one!
+    # _this = gmsh.model.geo # Not sure, what is the difference to the above one!
     
     ## POINTs ##
     shift_notch = 1; b_notch = False
