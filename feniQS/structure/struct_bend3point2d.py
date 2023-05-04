@@ -35,7 +35,7 @@ class ParsBend3Point2D(ParsBase):
             self.cmod_right # Right sensor position of CMOD (x coordinate)
             
             ## MESH
-            self.resolutions = {'res_y': int, 'scale': float, 'embedded_nodes': tuple, 'refinement_level': int}
+            self.resolutions = {'res_y': int, 'scale': float, 'embedded_nodes': tuple, 'refinement_level': int, el_size_max: float}
                 # 'res_y': the number of elements at vertical edges of the beam (at each of left/right sides).
                     # This together with 'scale' will determine the resolutions at remaining edges.
                 # 'scale': a factor by which the element sizes are scaled towards the center of the beam.
@@ -47,6 +47,7 @@ class ParsBend3Point2D(ParsBase):
                 # 'refinement_level': A non-negative integer.
                     By default is 0, meaning no refinement.
                     For refinement_level>0, the original mesh is subjected to df.refine() routine for 'refinement_level' times.
+                # 'el_size_max' : A float dpecifying the maximum element size (when a certain level of refined mesh is required).
             
             ## LOADs and BCs
             self.fix_x_at # 'left' or 'right'
@@ -123,11 +124,15 @@ class Bend3Point2D(StructureFEniCS):
     
     def _build_mesh(self):
         self.embedded_nodes = np.array(self.pars.resolutions['embedded_nodes'])
-        return notched_rectangle_mesh(lx=self.pars.lx, ly=self.pars.ly, \
-                                      load_Xrange=[self.pars.x_from, self.pars.x_to], l_notch=self.pars.l_notch, h_notch=self.pars.h_notch, c_notch=self.pars.left_notch+self.pars.l_notch/2 \
-                                          , left_sup=self.pars.left_sup, right_sup=self.pars.right_sup, left_sup_w=self.pars.left_sup_w, right_sup_w=self.pars.right_sup_w \
-                                              , res_y=self.pars.resolutions['res_y'], scale=self.pars.resolutions['scale'] \
-                                                  , embedded_nodes=self.embedded_nodes, _path=self._path)
+        return notched_rectangle_mesh(lx=self.pars.lx, ly=self.pars.ly \
+                                      , load_Xrange=[self.pars.x_from, self.pars.x_to] \
+                                      , l_notch=self.pars.l_notch, h_notch=self.pars.h_notch \
+                                      , c_notch=self.pars.left_notch+self.pars.l_notch/2 \
+                                      , left_sup=self.pars.left_sup, right_sup=self.pars.right_sup \
+                                      , left_sup_w=self.pars.left_sup_w, right_sup_w=self.pars.right_sup_w \
+                                      , res_y=self.pars.resolutions['res_y'], scale=self.pars.resolutions['scale'] \
+                                      , embedded_nodes=self.embedded_nodes, el_size_max=self.pars.resolutions['el_size_max'] \
+                                      , _path=self._path)
         ParsBend3Point2D.set_embedded_nodes(self.pars, self.embedded_nodes) # since self.embedded_nodes might have been adjusted (veryyyyy slightly) in mesh generation process.
         
     def _build_structure(self, _build_middle_load=True):

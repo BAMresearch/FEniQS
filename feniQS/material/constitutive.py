@@ -110,11 +110,18 @@ class ElasticConstitutive():
 
 class GradientDamageConstitutive(ElasticConstitutive):
     
-    def __init__(self, E, nu, constraint, gK, c, h=0.0, interaction_function=lambda D:1, fn_eps_eq=None, epsilon_eq_num=None):
+    def __init__(self, E, nu, constraint, gK, c_min, c \
+                 , h=0.0, interaction_function=lambda D:1. \
+                    , fn_eps_eq=None, epsilon_eq_num=None):
         super().__init__(E, nu, constraint)
         
         self.gK = gK
-        self.c = c # gradient damage constant (l^2 in Poh's 2017 paper)
+        # c_total = c + c_min is the Gradient damage constant (l^2 in Poh's 2017 paper)
+        self.c_min = c_min
+        self.c = c
+        ## NOTE: 'c_total' is NOT used locally, instead, is a parameter that will be used in the
+            # governing PDE of non-local damage (essentially, in 'FenicsGradientDamage' class in feniQS.problem.problem.py)
+            # The minimum value 'c_min' is used to assert that (maximum mesh size) < sqrt(c_min). See check_c_min method below.
         self.h = h # coupling modulus (of Poh's paper in 2017)
         self.interaction_function = interaction_function # introduced as "g" in Poh's paper in 2017
         ### NOTE: The default values of "h" and "interaction_function" imply the "conventional gradient damage" introduced in Peerling's paper in 1996.
@@ -188,3 +195,11 @@ class GradientDamageConstitutive(ElasticConstitutive):
         ## WAY 1 (using ufl.conditional)
         return conditional_by_ufl(condition='le', f1=ebar, f2=K_old \
                                   , value_true=1., value_false=0.)
+    
+    @staticmethod
+    def check_c_min(c_min, mesh, safety=1.):
+        """
+        This checks appropriate value for c_min in regards to mesh size.
+        """
+        assert safety >= 1.
+        return (np.sqrt(c_min) >= safety * mesh.hmax())

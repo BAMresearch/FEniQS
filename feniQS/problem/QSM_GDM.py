@@ -53,7 +53,9 @@ class QSModelGDM(QuasiStaticModel):
                                           , ef=self.pars.ef+self.pars.ef_min, alpha=self.pars.alpha)
         else:
             raise NotImplementedError('The damage law is not considered.')
-        mat = GradientDamageConstitutive(E=self.pars.E + self.pars.E_min, nu=self.pars.nu, constraint=self.pars.constraint, gK=gK, c=self.pars.c + self.pars.c_min)
+        mat = GradientDamageConstitutive(E=self.pars.E + self.pars.E_min, nu=self.pars.nu \
+                                        , constraint=self.pars.constraint, gK=gK \
+                                        , c_min=self.pars.c_min, c=self.pars.c)
         
         ### PROBLEM ###
         self.fen = FenicsGradientDamage(mat, self.struct.mesh, fen_config=self.pars, jac_prep=self.pars.analytical_jac \

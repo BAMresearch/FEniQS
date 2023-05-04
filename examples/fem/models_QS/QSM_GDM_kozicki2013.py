@@ -16,8 +16,8 @@ def revise_pars_gdm_kozicki2013(pars):
     pars.e0_min = 6e-4
     pars.e0 = 5e-4 # e0_total = 11e4
     pars.ef = 35e-4
-    pars.c_min = 20
-    pars.c = 20 # c_total = 40
+    pars.c_min = 40.
+    pars.c = 0. # c_total = 40.
     
     # pars.shF_degree_u = 2
     # pars.shF_degree_ebar = 1
@@ -103,14 +103,16 @@ if __name__ == "__main__":
     pars_struct.loading_level *= 2. # larger loading, causing more damage
     pars_gdm = GDMPars(pars0=pars_struct) # We merge pars_struct to gdm model pars (through pars0)
     revise_pars_gdm_kozicki2013(pars_gdm)
+    pars_struct.resolutions['el_size_max'] = np.sqrt(pars_gdm.c_min) / 1.2
+    pars_gdm.resolutions['el_size_max'] = pars_struct.resolutions['el_size_max']
     
     ## MODEL (quasi static)
     model = get_QSM_GDM(pars_struct=pars_struct, cls_struct=Kozicki2013, pars_gdm=pars_gdm)
     
     ## SOLVE OPTIONs
     solver_options = get_fenicsSolverOptions() # regarding a single load-step
-    solver_options['tol_abs'] = 1e-11
-    solver_options['tol_rel'] = 1e-13
+    solver_options['tol_abs'] = 1e-10
+    solver_options['tol_rel'] = 1e-10
     # solver_options['type'] = 'snes'
     # solver_options['lin_sol'] = 'iterative'
     solve_options = QuasiStaticSolveOptions(solver_options) # regarding incremental solution

@@ -431,6 +431,11 @@ class FenicsGradientDamage(FenicsProblem, df.NonlinearProblem):
     def __init__(self, mat, mesh, fen_config, dep_dim=None \
                  , penalty_dofs=[], penalty_weight=df.Constant(0.) \
                      , K_current=df.Constant(0.0), jac_prep=False):
+        assert isinstance(mat, GradientDamageConstitutive)
+        ## Check appropriate value for c_min of the material in regards to mesh size:
+        b = GradientDamageConstitutive.check_c_min(c_min=mat.c_min, mesh=mesh)
+        if not b:
+            raise ValueError(f"The minimum value for the gradient damage characteristic length (c_min) is too small compared to the mesh size.\nEither increase this value or refine the mesh.")
         FenicsProblem.__init__(self, mat, mesh, fen_config, dep_dim \
                                , penalty_dofs=penalty_dofs, penalty_weight=penalty_weight)
         self.shF_degree_ebar = fen_config.shF_degree_ebar
@@ -473,19 +478,20 @@ class FenicsGradientDamage(FenicsProblem, df.NonlinearProblem):
         self.F_u = a_u - L_u
         
         ### for the second field
+        c_gdm = self.mat.c_min + self.mat.c
         # ## APPROACH 1: without applying divergence theorem
         # lap = div(grad(self.u_ebar))
-        # q = self.u_ebar - self.mat.c * lap
+        # q = self.u_ebar - c_gdm * lap
         # a_ebar = inner(q, self.v_ebar) * self.dxm
         # normal_vector = FacetNormal(self.mesh)
-        # a_ebar += self.mat.c * inner(dot(grad(self.u_ebar), normal_vector), self.v_ebar) * ds(self.mesh) # For natural boundary conditions
+        # a_ebar += c_gdm * inner(dot(grad(self.u_ebar), normal_vector), self.v_ebar) * ds(self.mesh) # For natural boundary conditions
         # eps_eq = self.mat.epsilon_eq(epsilon(self.u_u, _dim=self.dep_dim))
         # L_ebar = inner(eps_eq, self.v_ebar) * self.dxm # Here "eps_eq" is similar to an external force applying to the second field system
         # self.F_ebar = a_ebar - L_ebar
         ## APPROACH 2: after applying divergence theorem
         a_ebar = df.inner(self.u_ebar, self.v_ebar) * self.dxm
         interaction = self.mat.interaction_function(self.mat.gK.g(u_Kmax))
-        a_ebar += self.mat.c * interaction * df.dot(grad(self.u_ebar), grad(self.v_ebar)) * self.dxm
+        a_ebar += c_gdm * interaction * df.dot(grad(self.u_ebar), grad(self.v_ebar)) * self.dxm
         eps_eq = self.mat.epsilon_eq(epsilon(self.u_u, _dim=self.dep_dim))
         L_ebar = df.inner(eps_eq, self.v_ebar) * self.dxm # Here "eps_eq" is similar to an external force applying to the second field system
         self.F_ebar = self.ebar_residual_weight * (a_ebar - L_ebar)

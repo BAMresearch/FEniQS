@@ -32,7 +32,11 @@ class ParsKozicki2013(ParsBend3Point2D):
             self.cmod_right = self.left_notch + self.l_notch
             
             ## MESH
-            self.resolutions = {'res_y': 4, 'scale': 0.25, 'embedded_nodes': (), 'refinement_level': 0}
+            self.resolutions = {'res_y': 4,
+                                'scale': 0.25,
+                                'embedded_nodes': (),
+                                'refinement_level': 0,
+                                'el_size_max': None}
                 # scale (regarding mesh size) is total and towards the center with respect to the left_right sides
             
             ## LOADs and BCs
