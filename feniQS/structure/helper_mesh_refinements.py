@@ -286,10 +286,6 @@ class MeshRefinementsSimulations:
         plt.savefig(f"{path}/error_to_finest_{descr}_{what}_{key}.png", bbox_inches='tight', dpi=300)
         plt.show()
 
-if __name__=='__main__':
-    pass
-
-
 # =============================================================================
 # OLD METHOD (not used)
 # =============================================================================

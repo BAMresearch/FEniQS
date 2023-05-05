@@ -10,7 +10,6 @@ pth_model_time_varying.add_script(pth_problem)
 pth_model_time_varying.add_script(pth_time_stepper)
 pth_model_time_varying.add_script(pth_yaml_functions)
 
-
 class QuasiStaticSolveOptions(ParsBase):
     def __init__(self, solver_options=None, **options_dict):
         ## SOLVER
@@ -162,16 +161,3 @@ class QuasiStaticModel:
     
     def get_reaction_dofs(self, reaction_places):
         pass
-    
-    
-if __name__=='__main__':
-    def write_some_pars():
-        p1 = QuasiStaticSolveOptions()
-        p2 = QuasiStaticSolveOptions(solver_options=get_fenicsSolverOptions())
-        ParsBase.unique_write(pars_list=[p1], pars_names=['p1'], root='./uniquely_write_pars/', subdir='p1')
-        ParsBase.unique_write(pars_list=[p2], pars_names=['p2'], root='./uniquely_write_pars/')
-        ParsBase.unique_write(pars_list=[p1, p2], pars_names=['p1', 'p2'], root='./uniquely_write_pars/pars_group/', subdir='p1p2')
-        ParsBase.unique_write(pars_list=[p1, p2], pars_names=['p1', 'p2'], root='./uniquely_write_pars/pars_group/')
-        return p1, p2
-    p1, p2 = write_some_pars()
-    p1, p2 = write_some_pars()
