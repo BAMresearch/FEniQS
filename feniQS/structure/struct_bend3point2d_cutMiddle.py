@@ -164,26 +164,5 @@ class Bend3Point2D_cutMiddle(Bend3Point2D):
         else:
             nodes = np.array(nodes)
         return nodes
-        
-if __name__=='__main__':
-    from problems.struct_kozicki2013 import *
-    pars = ParsKozicki2013()
-    struct = Kozicki2013(pars)
-    struct.yamlDump_pars()
-    bm = df.BoundaryMesh(struct.mesh, "exterior", True)
-    plt.figure()
-    df.plot(struct.mesh)
-    plt.plot(bm.coordinates()[:,0], bm.coordinates()[:,1], color='red', linestyle='', marker='.', label='Boundary nodes')
-    plt.legend()
-    plt.show()
-    
-    struct_cut = Bend3Point2D_cutMiddle(parent_struct=struct, intervals_or_nodes=[[100,220], None])
-    struct_cut.yamlDump_pars()
-    bm_cut = struct_cut._get_cutting_nodes()
-    plt.figure()
-    df.plot(struct_cut.mesh)
-    plt.plot(bm_cut[:,0], bm_cut[:,1], color='red', linestyle='', marker='.', label='Cutting nodes')
-    plt.legend()
-    plt.show()
     
     

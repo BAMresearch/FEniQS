@@ -160,16 +160,3 @@ class Rectangle2D(StructureFEniCS):
         else:
             raise ValueError(f"Loading control is not recognized. Possible values are 'u' and 'f' .")
         self.pars.loading_control = loading_control
-
-if __name__=='__main__':
-    pars = ParsRectangle2D()
-    struct = Rectangle2D(pars)
-    
-    from feniQS.problem.QSM_GDM import *
-    pars_gdm = GDMPars()
-    pars_gdm.e0_min = 1.0 # Pure elastic
-    model = QSModelGDM(pars_gdm, struct)
-    
-    solve_options = QuasiStaticSolveOptions(solver_options=get_fenicsSolverOptions())
-    solve_options.reaction_places = ['bot_left_y', 'bot_right_y', 'top_left_y', 'top_right_y']
-    model.solve(solve_options)

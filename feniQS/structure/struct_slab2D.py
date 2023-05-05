@@ -170,7 +170,3 @@ class Slab2D(StructureFEniCS):
             plt.savefig(_path + 'meshView.png', bbox_inches='tight', dpi=dpi)
             plt.show()
         return ax, {'dpi': dpi}
-
-if __name__=='__main__':
-    pars = ParsSlab2D()
-    struct = Slab2D(pars)

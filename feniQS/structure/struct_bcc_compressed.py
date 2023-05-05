@@ -138,8 +138,3 @@ class BccCompressed(StructureFEniCS):
         # time_varying_loadings ???
         
         return bcs_DR, bcs_DR_inhom, time_varying_loadings
-
-if __name__=='__main__':
-    pars = ParsBccCompressed()
-    struct = BccCompressed(pars)
-    struct.yamlDump_pars()
