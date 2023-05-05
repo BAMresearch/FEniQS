@@ -298,8 +298,3 @@ class Bend3Point2D(StructureFEniCS):
             plt.savefig(_path + 'meshView.png', bbox_inches='tight', dpi=dpi)
             plt.show()
         return ax, {'dpi': dpi}
-        
-
-if __name__=='__main__':
-    pass
-
