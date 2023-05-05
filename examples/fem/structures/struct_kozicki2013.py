@@ -30,18 +30,11 @@ class ParsKozicki2013(ParsBend3Point2D):
                                 'embedded_nodes': (),
                                 'refinement_level': 0,
                                 'el_size_max': None}
-                # scale (regarding mesh size) is total and towards the center with respect to the left_right sides
             
             ## LOADs and BCs
             self.fix_x_at = 'left'
-            
             self.loading_control = 'u'
             self.loading_level = - 0.35
-            # self.loading_level = - 0.10 # Only elastic
-            
-            # self.loading_control = 'f'
-            # self.loading_level = -587.8071109591015 / (load_span_scale * self.lx) # Only elastic
-            
             self.loading_scales = (1,)
             self.loading_case = 'ramp'
             self.loading_N = 1.0 # only relevant if case=sin or case=zigzag
