@@ -1,13 +1,5 @@
-import sys
-if './' not in sys.path:
-    sys.path.append('./')
-
 from feniQS.problem.QSM_GDM import *
 from examples.fem.structures.struct_kozicki2013 import *
-
-pth_QSM_GDM_kozicki2013 = CollectPaths('QSM_GDM_kozicki2013.py')
-pth_QSM_GDM_kozicki2013.add_script(pth_QSM_GDM)
-pth_QSM_GDM_kozicki2013.add_script(pth_struct_kozicki2013)
 
 def revise_pars_gdm_kozicki2013(pars):
     pars.constraint = 'PLANE_STRAIN'

@@ -1,7 +1,3 @@
-import sys
-if './' not in sys.path:
-    sys.path.append('./')
-
 import numpy as np
 import dolfin as df
 import ufl

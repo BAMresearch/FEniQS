@@ -1,7 +1,3 @@
-import sys
-if './' not in sys.path:
-    sys.path.append('./')
-
 from feniQS.fenics_helpers.fenics_expressions import *
 
 pth_helper_loadings = CollectPaths('helper_loadings.py')

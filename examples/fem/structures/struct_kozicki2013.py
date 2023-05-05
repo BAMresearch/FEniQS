@@ -1,11 +1,4 @@
-import sys
-if './' not in sys.path:
-    sys.path.append('./')
-
 from feniQS.structure.struct_bend3point2d import *
-
-pth_struct_kozicki2013 = CollectPaths('struct_kozicki2013.py')
-pth_struct_kozicki2013.add_script(pth_struct_bend3point2d)
 
 class ParsKozicki2013(ParsBend3Point2D):
     """

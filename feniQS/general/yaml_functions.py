@@ -1,7 +1,3 @@
-import sys
-if './' not in sys.path:
-    sys.path.append('./')
-
 from feniQS.general.general import CollectPaths
 
 import numpy as np

@@ -1,7 +1,3 @@
-import sys
-if './' not in sys.path:
-    sys.path.append('./')
-
 from feniQS.structure.helper_mesh_gmsh_meshio import *
 import dolfin as df
 

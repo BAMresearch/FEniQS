@@ -3,11 +3,6 @@ This implements the section (2.3) of the paper:
     https://www.sciencedirect.com/science/article/pii/S099775389900114X
 , which models gradient damage model subjected to plasticity hardening.
 """
-
-import sys
-if './' not in sys.path:
-    sys.path.append('./')
-
 from feniQS.problem.problem import *
 from feniQS.problem.problem_plastic import *
 

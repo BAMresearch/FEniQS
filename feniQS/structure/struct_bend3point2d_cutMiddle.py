@@ -1,7 +1,3 @@
-import sys
-if './' not in sys.path:
-    sys.path.append('./')
-
 from feniQS.structure.struct_bend3point2d import *
 
 pth_struct_bend3point2d_cutMiddle = CollectPaths('struct_bend3point2d_cutMiddle.py')

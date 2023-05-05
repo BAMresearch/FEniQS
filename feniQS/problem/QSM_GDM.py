@@ -4,10 +4,6 @@ QSM:
 GDM:
     Gradient Damage Material Model
 """
-import sys
-if './' not in sys.path:
-    sys.path.append('./')
-
 from feniQS.problem.model_time_varying import *
 from feniQS.problem.post_process import *
 from feniQS.general.yaml_functions import *

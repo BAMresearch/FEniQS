@@ -1,7 +1,3 @@
-import sys
-if './' not in sys.path:
-    sys.path.append('./')
-
 import os
 import dolfin as df
 from feniQS.general.general import CollectPaths, make_path

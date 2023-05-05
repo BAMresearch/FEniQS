@@ -1,7 +1,3 @@
-import sys
-if './' not in sys.path:
-    sys.path.append('./')
-
 from feniQS.problem.problem import *
 from feniQS.fenics_helpers.fenics_functions import LocalProjector
 from feniQS.material.constitutive_plastic import *

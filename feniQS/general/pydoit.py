@@ -1,7 +1,3 @@
-import sys
-if './' not in sys.path:
-    sys.path.append('./')
-
 class DoitTaskManager:
     """
     A base class for handling pydo stuff.

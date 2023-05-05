@@ -1,7 +1,3 @@
-import sys
-if './' not in sys.path:
-    sys.path.append('./')
-
 import numpy as np
 import dolfin as df
 from feniQS.fenics_helpers.fenics_functions import boundary_condition_pointwise, boundary_condition, pth_fenics_functions

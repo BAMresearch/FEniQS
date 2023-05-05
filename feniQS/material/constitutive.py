@@ -1,7 +1,3 @@
-import sys
-if './' not in sys.path:
-    sys.path.append('./')
-
 from ufl import grad, nabla_grad, div, nabla_div, sym
 from feniQS.material.damage import *
 from feniQS.material.fenics_mechanics import *

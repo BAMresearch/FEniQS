@@ -1,7 +1,3 @@
-import sys
-if './' not in sys.path:
-    sys.path.append('./')
-
 from feniQS.problem.problem_elastic_homogenized import *
 
 if __name__ == "__main__":

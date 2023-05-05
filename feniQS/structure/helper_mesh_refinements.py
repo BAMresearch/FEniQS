@@ -1,12 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Nov 14 2022
-
-@author: ajafari
-"""
-
-from py_fenics.model_time_varying import *
+from feniQS.problem.model_time_varying import *
 
 pth_helper_mesh_refinements = CollectPaths('helper_mesh_refinements.py')
 pth_helper_mesh_refinements.add_script(pth_model_time_varying)

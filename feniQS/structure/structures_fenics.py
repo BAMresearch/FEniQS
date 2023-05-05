@@ -1,7 +1,3 @@
-import sys
-if './' not in sys.path:
-    sys.path.append('./')
-
 from feniQS.problem.model_time_varying import *
 from feniQS.general.general import *
 
