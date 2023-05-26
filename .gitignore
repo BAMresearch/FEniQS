@@ -1,0 +1,9 @@
+.gitignore
+.doit.db.bak
+.doit.db.dat
+.doit.db.dir
+QS_MODELs/
+STRUCTUREs/
+tests/test_peerling_2d_noo0/
+problems/__pycache__/
+__pycache__/
