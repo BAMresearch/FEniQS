@@ -57,13 +57,13 @@ class FenicsPlasticGDM(FenicsProblem):
         eps_u = eps_vector(self.u_u, self.mat.constraint) # regarding function
         eps_v = eps_vector(self.v_u, self.mat.constraint) # regarding test function
         eps_d = eps_vector(self.d_u, self.mat.constraint) # regarding trial function
-        
+        c_total = self.mat.c_min + self.mat.c
         ### nonlinear terms in self.R (needed to be updated/resolved):
             # self.q_sigma
             # self.q_eeq
         self.R = expr_sigma_scale * df.inner(eps_v, self.q_sigma) * self.dxm
         self.R += self.v_ebar * (self.u_ebar - self.q_eeq) * self.dxm
-        self.R += df.dot(df.grad(self.v_ebar), self.mat.c * df.grad(self.u_ebar)) * self.dxm
+        self.R += df.dot(df.grad(self.v_ebar), c_total * df.grad(self.u_ebar)) * self.dxm
         
         ### nonlinear terms in self.dR (needed to be updated/resolved):
             # self.q_dsigma_deps
@@ -72,7 +72,7 @@ class FenicsPlasticGDM(FenicsProblem):
         self.dR = expr_sigma_scale * df.inner(eps_d, self.q_dsigma_deps * eps_v) * self.dxm
         self.dR += expr_sigma_scale * self.d_ebar * df.dot(self.q_dsigma_de, eps_v) * self.dxm
         self.dR += df.inner(eps_d, - self.q_deeq_deps * self.v_ebar) * self.dxm
-        self.dR += (self.d_ebar * self.v_ebar + df.dot(df.grad(self.d_ebar), self.mat.c * df.grad(self.v_ebar)) ) * self.dxm
+        self.dR += (self.d_ebar * self.v_ebar + df.dot(df.grad(self.d_ebar), c_total * df.grad(self.v_ebar)) ) * self.dxm
         
         self._resolve_damage() # VERY IMPORTANT
         
