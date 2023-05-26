@@ -87,8 +87,8 @@ class GDMPars(ParsBase):
             
             self.alpha = 0.99
             
-            self.c_min = 0. # will be added to self.c
-            self.c = 10.
+            self.c_min = 10. # minimum value for c (must not be zero, since it decides if the nonlocal damage lengths is large enough compared to a given mesh)
+            self.c = 0.
             
             self.el_family = 'Lagrange'
             self.shF_degree_u = 1
