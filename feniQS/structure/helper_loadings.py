@@ -19,10 +19,10 @@ class ParsLoading:
         # self.case = 'zigzag'
         
         self.level = level
-        # self.scales = np.array([1.0])
-        self.scales = np.array([1.0, -1.5, 2.0])
+        self.scales = np.array([1.0])
+        # self.scales = np.array([1.0, -1.5, 2.0])
         
-        self.N = 1.5
+        self.N = 0.5
         
         self.T = 1.0
         self.t_end = self.T
