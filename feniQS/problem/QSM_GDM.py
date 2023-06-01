@@ -112,5 +112,50 @@ class QSModelGDM(QuasiStaticModel):
     
     def get_reaction_dofs(self, reaction_places):
         return self.struct.get_reaction_dofs(reaction_places, i_u=self.fen.get_iu())
-
     
+    @staticmethod
+    def verify_by_imposing_displacements_at_free_DOFs(model_solved, solve_options, _plot=False):
+        """
+        IMPORTANT:
+        - The input model must have been solved, since the solved displacements are used / imposed.
+        - The displacements at free DOFs are imposed as extra Dirichlet BC.
+        This method returns the evaluation of force residuals (internal forces) at free DOFs.
+        """
+        fen = model_solved.fen
+        i_full = fen.get_i_full()
+        i_u = fen.get_iu()
+        
+        Ps_all = model_solved.struct.mesh.coordinates()
+        dofs_Dirichlet = fen.bcs_DR_dofs + fen.bcs_DR_inhom_dofs
+        Ps_Dirichlet = i_full.tabulate_dof_coordinates()[dofs_Dirichlet,:]
+        ids_ = find_among_points(Ps_Dirichlet, Ps_all, fen.mesh.hmin()/1000.)
+        Ps_free = np.array([P for i,P in enumerate(Ps_all) if i not in ids_])
+
+        if _plot:
+            plt.figure()
+            df.plot(model_solved.struct.mesh, color='0.80')
+            plt.plot(Ps_Dirichlet[:,0], Ps_Dirichlet[:,1], label='Dirichlet DOFs', linestyle='', marker='P', fillstyle='none')
+            plt.plot(Ps_free[:,0], Ps_free[:,1], label='Free DOFs', linestyle='', marker='.')
+            plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+            plt.show()
+
+        pp0 = model_solved.pps[0]
+        Us_free = np.array(pp0.eval_checked_u(Ps_free))
+
+        many_bc = ManyBCs(V=i_full, v_bc=i_u, points=Ps_free, sub_ids=[0])
+        initiated_bcs = [many_bc.bc]
+        bcs_assigner = many_bc.assign
+        model_solved.revise_BCs(remove=False, new_BCs=initiated_bcs, _as='inhom')
+        evolver = ValuesEvolverInTime(bcs_assigner, Us_free, solve_options.checkpoints)
+        model_solved.prep_methods = [evolver]
+
+        res_dofs = dofs_at(Ps_free, i_full, i_u)
+        pp_res = PostProcessEvalForm(form=fen.get_F_and_u()[0], dofs=res_dofs, checkpoints=solve_options.checkpoints)
+        model_solved.pps_default['pp_res'] = pp_res
+
+        model_solved.build_solver(solve_options)
+        model_solved.solve(solve_options)
+
+        res0 = np.array(pp_res.checked)
+
+        return res0
