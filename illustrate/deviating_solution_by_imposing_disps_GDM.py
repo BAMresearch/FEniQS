@@ -1,4 +1,5 @@
 from feniQS.structure.struct_slab2D import *
+from feniQS.structure.struct_kozicki2013 import *
 from feniQS.problem.QSM_GDM import *
 import copy
 
@@ -7,26 +8,33 @@ if __name__=='__main__':
 
     _path = './illustrate/deviating_solution_by_imposing_disps_GDM/'
 
+    ### STRUCTURE-1 ###
     pars_struct = ParsSlab2D()
     ParsSlab2D.set_embedded_nodes(pars_struct, [])
     pars_struct.lx *= 10.
     pars_struct.loading_level *= 0.5
-    pars_struct.res_x = 80
-    pars_struct.res_y = 8
+    pars_struct.res_x = 100
+    pars_struct.res_y = 10
     struct = Slab2D(pars_struct, _path=f"{_path}structure/")
     def my_expression(x):
-        if 0.2<x[1]<0.8 and 4.5<x[0]<5.5:
-            return 0.9
+        if 0.3<=x[1]<=0.7 and 4.8<x[0]<5.2:
+            return 0.01
         else:
             return 1.
     expr = SpatialExpressionFromPython(my_expression, dim=0)
     struct.special_fenics_fields['sigma_scale'] = expr
     reaction_places = ['left', 'right']
 
+    ### STRUCTURE-2 ###
+    # pars_struct = ParsKozicki2013()
+    # struct = Kozicki2013(pars_struct, _path=f"{_path}structure/")
+    # reaction_places = ['y_middle']
+
+    ### GDM ###
     pars = GDMPars(pars0=pars_struct)
     pars.ef = 1e-3
     pars.c_min = (1.4 * struct.mesh.hmax()) ** 2
-    pars.constraint = 'PLANE_STRESS'
+    pars.constraint = 'PLANE_STRAIN'
     qsm_path_direct = f"{_path}QSM_direct/"
     model = QSModelGDM(pars=pars, struct=struct, _path=qsm_path_direct)
     pp_K = PostProcessEvalFunc(model.fen.u_K_current)
@@ -47,6 +55,7 @@ if __name__=='__main__':
     K_checked_direct = copy.deepcopy(np.array(pp_K.checked))
     ts_direct = copy.deepcopy(model.pps[0].ts)
     Fs_direct = model.pps[0].plot_reaction_forces(reaction_places)
+    f_max = np.max(abs(np.array(Fs_direct)))
 
     qsm_path_impose = f"{_path}QSM_impose/"
     model._path = qsm_path_impose
@@ -58,8 +67,8 @@ if __name__=='__main__':
 
     plt.figure()
     for i, r0 in enumerate(res0):
-        plt.plot(r0, linestyle='--', label=f"LS={i}")
-    plt.legend()
+        plt.plot(r0, linestyle='--', label=f"LS={i}, sum/f_max={(sum(r0) / f_max):.2e}")
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     plt.xlabel('DOF'); plt.ylabel('Residual')
     plt.title(f"Residuals at free DOFs after imposing the solved displacements")
     plt.savefig(f"{qsm_path_impose}free_residuals.png", bbox_inches='tight', dpi=400)
@@ -71,13 +80,13 @@ if __name__=='__main__':
         fig = plt.figure()
         plt.plot(ts_direct, f_difect, marker='.', label='Direct solution')
         plt.plot(ts_impose, f_impose, marker='o', fillstyle='none', label='Solved by imposed displacements')
-        plt.legend()
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.title(f"Reaction force at {rp}")
         plt.xlabel('t'); plt.ylabel('F')
         plt.savefig(f"{_path}compare_reaction_force_{rp}.png", bbox_inches='tight', dpi=400)
         plt.show()
 
-    rel_err = 0.05
+    rel_err = 0.03
     path_GPs = f"{_path}compare_history_variable/"
     make_path(path_GPs)
     bad_GPs_ids = []
@@ -94,15 +103,16 @@ if __name__=='__main__':
         plt.plot(K_impose, linestyle='', marker='o', fillstyle='none', label=f"Imposed")
         plt.xlabel(f"Gauss point ID"); plt.ylabel(f"Kappa")
         plt.title(f"Load-step = {i}")
-        plt.legend()
+        plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.savefig(f"{path_GPs}compare_history_LS_{i}.png", bbox_inches='tight', dpi=400)
         plt.show()
     
     bad_GPs = np.array([model.fen.i_K.tabulate_dof_coordinates()[ii, :] for ii in bad_GPs_ids])
     fig = plt.plot()
     df.plot(model.fen.mesh, color='gray', linewidth=min(1., model.struct.mesh.rmin()/1.))
-    plt.plot(bad_GPs[:,0], bad_GPs[:,1], marker='*', label='Inaccurate GPs', linestyle='')
-    plt.legend()
+    if len(bad_GPs)>0:
+        plt.plot(bad_GPs[:,0], bad_GPs[:,1], marker='*', label='Inaccurate GPs', linestyle='')
+    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
     plt.title(f"Inaccurate GPs with relative error of {rel_err}")
     plt.savefig(f"{path_GPs}inaccurate_GPs.png", bbox_inches='tight', dpi=500)
     plt.show()
