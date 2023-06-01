@@ -283,7 +283,7 @@ class Bend3Point2D(StructureFEniCS):
         return nodes[ids_, :]
     
     def plot_mesh(self, ax=None, _save=True, _path=None):
-        rm = self.mesh.rmin(); dpi = max(500, 200. / rm)
+        rm = self.mesh.rmin(); dpi = min(500, 200. / rm)
         if ax is None:
             fig, ax = plt.subplots()
         df.plot(self.mesh, color='gray', linewidth=min(1., rm/2.))
