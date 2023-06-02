@@ -1,4 +1,4 @@
-from feniQS.structure.struct_slab2D import *
+from feniQS.structure.struct_slab2D_long import *
 from feniQS.structure.struct_kozicki2013 import *
 from feniQS.problem.QSM_GDM import *
 import copy
@@ -9,20 +9,9 @@ if __name__=='__main__':
     _path = './illustrate/deviating_solution_by_imposing_disps_GDM/'
 
     ### STRUCTURE-1 ###
-    pars_struct = ParsSlab2D()
-    ParsSlab2D.set_embedded_nodes(pars_struct, [])
-    pars_struct.lx *= 10.
-    pars_struct.loading_level *= 0.5
-    pars_struct.res_x = 100
-    pars_struct.res_y = 10
-    struct = Slab2D(pars_struct, _path=f"{_path}structure/")
-    def my_expression(x):
-        if 0.3<=x[1]<=0.7 and 4.8<x[0]<5.2:
-            return 0.01
-        else:
-            return 1.
-    expr = SpatialExpressionFromPython(my_expression, dim=0)
-    struct.special_fenics_fields['sigma_scale'] = expr
+    pars_struct = ParsSlab2DLong()
+    pars_struct.red_factor = 0.01 # imperfection of material at the middle
+    struct = Slab2DLong(pars_struct, _path=f"{_path}structure/")
     reaction_places = ['left', 'right']
 
     ### STRUCTURE-2 ###
