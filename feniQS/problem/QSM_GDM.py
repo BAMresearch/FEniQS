@@ -114,17 +114,20 @@ class QSModelGDM(QuasiStaticModel):
         return self.struct.get_reaction_dofs(reaction_places, i_u=self.fen.get_iu())
     
     @staticmethod
-    def solve_by_imposing_displacements_at_free_DOFs(model_solved, solve_options, _plot=False):
+    def solve_by_imposing_displacements_at_free_DOFs(model_solved, solve_options \
+                                                     , path_extension='', _plot=False):
         """
         IMPORTANT:
         - The input model must have been solved, since the solved displacements are used / imposed.
         - The displacements at free DOFs are imposed as extra Dirichlet BC.
         This method returns the evaluation of force residuals (internal forces) at free DOFs.
         """
+        print(f"\n------ QS-MODEL (WARNING):\n\t\tThe called method 'solve_by_imposing_displacements_at_free_DOFs' modifies the model; e.g. the BCs and postprocessors.\n------")
         fen = model_solved.fen
         i_full = fen.get_i_full()
         i_u = fen.get_iu()
         
+        ## Preparation
         Ps_all = model_solved.struct.mesh.coordinates()
         dofs_Dirichlet = fen.bcs_DR_dofs + fen.bcs_DR_inhom_dofs
         Ps_Dirichlet = i_full.tabulate_dof_coordinates()[dofs_Dirichlet,:]
@@ -142,6 +145,9 @@ class QSModelGDM(QuasiStaticModel):
         pp0 = model_solved.pps[0]
         Us_free = np.array(pp0.eval_checked_u(Ps_free))
 
+        ## Solving by imposition
+        model_path = model_solved._path
+        model_solved._path += path_extension
         many_bc = ManyBCs(V=i_full, v_bc=i_u, points=Ps_free, sub_ids=[0])
         initiated_bcs = [many_bc.bc]
         bcs_assigner = many_bc.assign
@@ -155,6 +161,8 @@ class QSModelGDM(QuasiStaticModel):
 
         model_solved.build_solver(solve_options)
         model_solved.solve(solve_options)
+
+        model_solved._path = model_path
 
         res0 = np.array(pp_res.checked)
 
