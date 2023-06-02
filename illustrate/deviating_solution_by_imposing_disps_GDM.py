@@ -59,7 +59,7 @@ if __name__=='__main__':
 
     qsm_path_impose = f"{_path}QSM_impose/"
     model._path = qsm_path_impose
-    res0 = QSModelGDM.verify_by_imposing_displacements_at_free_DOFs( \
+    res0 = QSModelGDM.solve_by_imposing_displacements_at_free_DOFs( \
         model_solved=model, solve_options=solve_options, _plot=True)
     K_checked_impose = copy.deepcopy(np.array(pp_K.checked))
     ts_impose = copy.deepcopy(model.pps[0].ts)

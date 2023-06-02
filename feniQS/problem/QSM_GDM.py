@@ -114,7 +114,7 @@ class QSModelGDM(QuasiStaticModel):
         return self.struct.get_reaction_dofs(reaction_places, i_u=self.fen.get_iu())
     
     @staticmethod
-    def verify_by_imposing_displacements_at_free_DOFs(model_solved, solve_options, _plot=False):
+    def solve_by_imposing_displacements_at_free_DOFs(model_solved, solve_options, _plot=False):
         """
         IMPORTANT:
         - The input model must have been solved, since the solved displacements are used / imposed.
