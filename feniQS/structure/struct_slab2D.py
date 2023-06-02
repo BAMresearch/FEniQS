@@ -60,7 +60,7 @@ class Slab2D(StructureFEniCS):
         return slab2D_mesh(lx=self.pars.lx, ly=self.pars.ly \
                            , res_x=self.pars.res_x, res_y=self.pars.res_y
                            , embedded_nodes=self.embedded_nodes, _path=self._path)
-        ParsBend3Point2D.set_embedded_nodes(self.pars, self.embedded_nodes) # since self.embedded_nodes might have been adjusted (veryyyyy slightly) in mesh generation process.
+        ParsSlab2D.set_embedded_nodes(self.pars, self.embedded_nodes) # since self.embedded_nodes might have been adjusted (veryyyyy slightly) in mesh generation process.
 
     def _build_structure(self, _build_load=True):
         ### MESH ###
