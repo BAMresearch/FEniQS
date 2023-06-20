@@ -133,21 +133,34 @@ class QSModelGDM(QuasiStaticModel):
         Ps_Dirichlet = i_full.tabulate_dof_coordinates()[dofs_Dirichlet,:]
         ids_ = find_among_points(Ps_Dirichlet, Ps_all, fen.mesh.hmin()/1000.)
         Ps_free = np.array([P for i,P in enumerate(Ps_all) if i not in ids_])
-
+        _path_extended = model_solved._path + path_extension
+        make_path(_path_extended)
+        
         if _plot:
-            plt.figure()
-            df.plot(model_solved.struct.mesh, color='0.80')
-            plt.plot(Ps_Dirichlet[:,0], Ps_Dirichlet[:,1], label='Dirichlet DOFs', linestyle='', marker='P', fillstyle='none')
-            plt.plot(Ps_free[:,0], Ps_free[:,1], label='Free DOFs', linestyle='', marker='.')
+            geo_dim = model_solved.struct.mesh.geometric_dimension()
+            if geo_dim==3:
+                print(f"WARNING: Plot of mesh and nodes for a 3-D mesh is not implemented.")
+            else:
+                plt.figure()
+                df.plot(model_solved.struct.mesh, color='0.80')
+                if geo_dim==1:
+                    dx = max(np.max(Ps_Dirichlet), np.max(Ps_free)) - min(np.min(Ps_Dirichlet), np.min(Ps_free))
+                    _y = dx / 20.
+                    plt.plot(Ps_Dirichlet[:], len(Ps_Dirichlet) * [_y], label='Dirichlet DOFs', linestyle='', marker='P', fillstyle='none')
+                    plt.plot(Ps_free[:], len(Ps_free) * [_y], label='Free DOFs', linestyle='', marker='.')
+                elif geo_dim==2:
+                    plt.plot(Ps_Dirichlet[:,0], Ps_Dirichlet[:,1], label='Dirichlet DOFs', linestyle='', marker='P', fillstyle='none')
+                    plt.plot(Ps_free[:,0], Ps_free[:,1], label='Free DOFs', linestyle='', marker='.')
             plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+            plt.savefig(f"{_path_extended}free_and_Dirichlet_DOFs.png", bbox_inches='tight', dpi=400)
             plt.show()
 
         pp0 = model_solved.pps[0]
-        Us_free = np.array(pp0.eval_checked_u(Ps_free))
+        Us_free = np.atleast_3d(pp0.eval_checked_u(Ps_free))
 
         ## Solving by imposition
-        model_path = model_solved._path
-        model_solved._path += path_extension
+        model_path = model_solved._path # backup
+        model_solved._path = _path_extended
         many_bc = ManyBCs(V=i_full, v_bc=i_u, points=Ps_free, sub_ids=[0])
         initiated_bcs = [many_bc.bc]
         bcs_assigner = many_bc.assign
@@ -162,7 +175,7 @@ class QSModelGDM(QuasiStaticModel):
         model_solved.build_solver(solve_options)
         model_solved.solve(solve_options)
 
-        model_solved._path = model_path
+        model_solved._path = model_path # set back
 
         res0 = np.array(pp_res.checked)
 
