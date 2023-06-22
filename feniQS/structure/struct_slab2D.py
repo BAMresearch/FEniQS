@@ -46,6 +46,23 @@ class ParsSlab2D(ParsBase):
             (to be hashable and able to be writtin/read to/from yaml file)
         """
         pars.embedded_nodes = tuple(tuple(float(c) for c in p) for p in embedded_nodes)
+    
+    @staticmethod
+    def get_regular_grid_points(pars, finement=2.0, x_range=None, include_edges=True):
+        if x_range is None:
+            _distance = pars.lx - 0.
+            x_range = [0. + 0.1 * _distance, pars.lx - 0.1 * _distance] # 80% of total length
+        x1, x2 = x_range
+        _res_y = int(pars.res_y * finement)
+        _res_x = int(_res_y * (x2-x1) / pars.ly)
+        xs = np.linspace(x1, x2, _res_x)
+        _dy = 0.5 * pars.ly / _res_y
+        ys = np.linspace(_dy, pars.ly - _dy, _res_y)
+        if include_edges:
+            ys = np.array([0.] + list(ys) + [pars.ly])
+        xv, yv = np.meshgrid(xs, ys)
+        _points = np.vstack([xv.ravel(), yv.ravel()]).T
+        return _points
 
 class Slab2D(StructureFEniCS):
     def __init__(self, pars, _path=None, _name=None):
@@ -154,6 +171,26 @@ class Slab2D(StructureFEniCS):
             raise ValueError(f"Loading control is not recognized. Possible values are 'u' and 'f' .")
         self.pars.loading_control = loading_control
     
+    def get_regular_grid_points(self, finement=2.0, x_range=None, include_edges=True):
+        return ParsSlab2D.get_regular_grid_points(pars=self.pars, finement=finement, x_range=x_range, include_edges=include_edges)
+
+    def get_window_of_nodes(self, x_range=None, y_range=None, sparse=1):
+        """
+        Returns every sparse-th node from a subset of mesh nodes located within a rectangle surrounded by x_range and y_range.
+        The x_range and y_range by default covers 4 surrounding edges of the beam.
+        """
+        nodes = self.mesh.coordinates() # all nodes
+        ids_ = []
+        if x_range is None:
+            x_range = [0., self.pars.lx]
+        if y_range is None:
+            y_range = [0., self.pars.ly]
+        for ic, c in enumerate(nodes):
+            if (x_range[0]<=c[0]<=x_range[1]) and (y_range[0]<=c[1]<=y_range[1]):
+                ids_.append(ic)
+        ids_ = ids_[::sparse]
+        return nodes[ids_, :]
+
     def plot_mesh(self, ax=None, _save=True, _path=None):
         rm = self.mesh.rmin(); dpi = min(500, 200. / rm)
         if ax is None:
