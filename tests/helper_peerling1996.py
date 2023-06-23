@@ -1,7 +1,7 @@
 from feniQS.general.general import *
 from feniQS.fenics_helpers.fenics_functions import *
 
-pth_helper_peerling1996 = CollectPaths('helper_peerling1996.py')
+pth_helper_peerling1996 = CollectPaths('./tests/helper_peerling1996.py')
 pth_helper_peerling1996.add_script(pth_general)
 pth_helper_peerling1996.add_script(pth_fenics_functions)
 

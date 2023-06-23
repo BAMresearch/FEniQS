@@ -2,7 +2,7 @@ import numpy as np
 import dolfin as df
 
 from feniQS.general.general import CollectPaths
-pth_fenics_expressions = CollectPaths('fenics_expressions.py')
+pth_fenics_expressions = CollectPaths('./feniQS/fenics_helpers/fenics_expressions.py')
 
 class DiracDeltaExpression(df.UserExpression):
     def __init__(self, radius, geo_dim):

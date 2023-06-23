@@ -8,7 +8,7 @@ from feniQS.problem.model_time_varying import *
 from feniQS.problem.post_process import *
 from feniQS.general.yaml_functions import *
 
-pth_QSM_GDM = CollectPaths('QSM_GDM.py')
+pth_QSM_GDM = CollectPaths('./feniQS/problem/QSM_GDM.py')
 pth_QSM_GDM.add_script(pth_model_time_varying)
 pth_QSM_GDM.add_script(pth_post_process)
 pth_QSM_GDM.add_script(pth_yaml_functions)

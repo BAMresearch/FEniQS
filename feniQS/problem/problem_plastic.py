@@ -2,7 +2,7 @@ from feniQS.problem.problem import *
 from feniQS.fenics_helpers.fenics_functions import LocalProjector
 from feniQS.material.constitutive_plastic import *
 
-pth_problem_plastic = CollectPaths('problem_plastic.py')
+pth_problem_plastic = CollectPaths('./feniQS/problem/problem_plastic.py')
 pth_problem_plastic.add_script(pth_problem)
 pth_problem_plastic.add_script(pth_fenics_functions)
 pth_problem_plastic.add_script(pth_constitutive_plastic)

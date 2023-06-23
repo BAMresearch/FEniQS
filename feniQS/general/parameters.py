@@ -3,7 +3,7 @@ import dolfin as df
 from feniQS.general.general import CollectPaths, make_path
 from feniQS.general.yaml_functions import *
 
-pth_parameters = CollectPaths('parameters.py')
+pth_parameters = CollectPaths('./feniQS/general/parameters.py')
 pth_parameters.add_script(pth_yaml_functions)
 
 def get_hashable_of_dict(dict_obj):

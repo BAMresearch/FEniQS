@@ -2,7 +2,7 @@ import numpy as np
 import dolfin as df
 from feniQS.general.general import *
 
-pth_fenics_functions = CollectPaths('fenics_functions.py')
+pth_fenics_functions = CollectPaths('./feniQS/fenics_helpers/fenics_functions.py')
 pth_fenics_functions.add_script(pth_general)
 
 def conditional_by_ufl(condition, f1, f2, value_true, value_false, tol=None):

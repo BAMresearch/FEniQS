@@ -7,7 +7,7 @@ _ss_vector = 'Voigt' # with (2) factor only in shear strains
 # _ss_vector = 'Mandel' # with sqrt(2) factor in both shear strains and shear stresses
 
 from feniQS.general.general import CollectPaths
-pth_fenics_mechanics = CollectPaths('fenics_mechanics.py')
+pth_fenics_mechanics = CollectPaths('./feniQS/material/fenics_mechanics.py')
 
 def ss_dim(constraint):
     constraint_switcher = {

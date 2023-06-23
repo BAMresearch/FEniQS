@@ -10,7 +10,7 @@ import numpy as np
         - Constitutive relations
 """
 
-pth_constitutive = CollectPaths('constitutive.py')
+pth_constitutive = CollectPaths('./feniQS/material/constitutive.py')
 pth_constitutive.add_script(pth_damage)
 pth_constitutive.add_script(pth_fenics_mechanics)
 

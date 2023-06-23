@@ -1,6 +1,6 @@
 from feniQS.structure.struct_slab2D import *
 
-pth_struct_slab2d_long = CollectPaths('struct_slab2D_long.py')
+pth_struct_slab2d_long = CollectPaths('./feniQS/structure/struct_slab2D_long.py')
 pth_struct_slab2d_long.add_script(pth_struct_slab2d)
 
 class ParsSlab2DLong(ParsSlab2D):

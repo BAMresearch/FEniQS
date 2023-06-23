@@ -4,7 +4,7 @@ from feniQS.fenics_helpers.fenics_functions import *
 from feniQS.fenics_helpers.fenics_expressions import *
 from feniQS.problem.fenics_solvers import *
 
-pth_problem = CollectPaths('problem.py')
+pth_problem = CollectPaths('./feniQS/problem/problem.py')
 pth_problem.add_script(pth_general)
 pth_problem.add_script(pth_constitutive)
 pth_problem.add_script(pth_fenics_functions)

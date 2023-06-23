@@ -3,7 +3,7 @@ from feniQS.fenics_helpers.fenics_functions import *
 from feniQS.structure.helper_loadings import *
 from feniQS.structure.helper_mesh_fenics import *
 
-pth_struct_bcc_compressed = CollectPaths('struct_bcc_compressed.py')
+pth_struct_bcc_compressed = CollectPaths('./feniQS/structure/struct_bcc_compressed.py')
 pth_struct_bcc_compressed.add_script(pth_structures_fenics)
 pth_struct_bcc_compressed.add_script(pth_fenics_functions)
 pth_struct_bcc_compressed.add_script(pth_helper_loadings)

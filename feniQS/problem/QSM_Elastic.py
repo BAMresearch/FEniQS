@@ -2,7 +2,7 @@ from feniQS.problem.model_time_varying import *
 from feniQS.problem.post_process import *
 from feniQS.general.yaml_functions import *
 
-pth_QSM_Elastic = CollectPaths('QSM_Elastic.py')
+pth_QSM_Elastic = CollectPaths('./feniQS/problem/QSM_Elastic.py')
 pth_QSM_Elastic.add_script(pth_model_time_varying)
 pth_QSM_Elastic.add_script(pth_post_process)
 pth_QSM_Elastic.add_script(pth_yaml_functions)

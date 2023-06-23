@@ -3,7 +3,7 @@ from feniQS.structure.helper_mesh_fenics import *
 from feniQS.fenics_helpers.fenics_functions import *
 from feniQS.structure.helper_loadings import *
 
-pth_struct_slab2d = CollectPaths('struct_slab2D.py')
+pth_struct_slab2d = CollectPaths('./feniQS/structure/struct_slab2D.py')
 pth_struct_slab2d.add_script(pth_structures_fenics)
 pth_struct_slab2d.add_script(pth_helper_mesh_fenics)
 pth_struct_slab2d.add_script(pth_fenics_functions)

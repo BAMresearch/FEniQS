@@ -1,6 +1,6 @@
 from feniQS.problem.model_time_varying import *
 
-pth_helper_mesh_refinements = CollectPaths('helper_mesh_refinements.py')
+pth_helper_mesh_refinements = CollectPaths('./feniQS/structure/helper_mesh_refinements.py')
 pth_helper_mesh_refinements.add_script(pth_model_time_varying)
 
 class MeshRefinementsPars(ParsBase):

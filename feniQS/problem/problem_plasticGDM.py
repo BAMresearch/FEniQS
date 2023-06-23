@@ -6,7 +6,7 @@ This implements the section (2.3) of the paper:
 from feniQS.problem.problem import *
 from feniQS.problem.problem_plastic import *
 
-pth_problem_plasticGDM = CollectPaths('problem_plasticGDM.py')
+pth_problem_plasticGDM = CollectPaths('./feniQS/problem/problem_plasticGDM.py')
 pth_problem_plasticGDM.add_script(pth_problem)
 pth_problem_plasticGDM.add_script(pth_problem_plastic)
 

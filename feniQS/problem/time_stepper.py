@@ -10,7 +10,7 @@ This script is taken from:
 """
 
 from feniQS.general.general import CollectPaths # only this is needed
-pth_time_stepper = CollectPaths('time_stepper.py')
+pth_time_stepper = CollectPaths('./feniQS/problem/time_stepper.py')
 
 class TimeStepper:
     def __init__(self, solve_function, post_process_functions=None, time_adjusting_methods=[], time_adjusting_args={}, logger=None, \

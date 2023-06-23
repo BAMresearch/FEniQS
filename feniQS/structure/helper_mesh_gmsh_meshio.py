@@ -5,7 +5,7 @@ import os
 
 from feniQS.general.general import make_path, CollectPaths
 
-pth_helper_mesh_gmsh_meshio = CollectPaths('helper_mesh_gmsh_meshio.py')
+pth_helper_mesh_gmsh_meshio = CollectPaths('./feniQS/structure/helper_mesh_gmsh_meshio.py')
 
 """
 f: file (only file name + format)

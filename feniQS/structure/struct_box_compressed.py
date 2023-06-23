@@ -2,7 +2,7 @@ from feniQS.structure.structures_fenics import *
 from feniQS.fenics_helpers.fenics_functions import *
 from feniQS.structure.helper_loadings import *
 
-pth_struct_box_compressed = CollectPaths('struct_box_compressed.py')
+pth_struct_box_compressed = CollectPaths('./feniQS/structure/struct_box_compressed.py')
 pth_struct_box_compressed.add_script(pth_structures_fenics)
 pth_struct_box_compressed.add_script(pth_fenics_functions)
 pth_struct_box_compressed.add_script(pth_helper_loadings)

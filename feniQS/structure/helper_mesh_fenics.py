@@ -1,7 +1,7 @@
 from feniQS.structure.helper_mesh_gmsh_meshio import *
 import dolfin as df
 
-pth_helper_mesh_fenics = CollectPaths('helper_mesh_fenics.py')
+pth_helper_mesh_fenics = CollectPaths('./feniQS/structure/helper_mesh_fenics.py')
 pth_helper_mesh_fenics.add_script(pth_helper_mesh_gmsh_meshio)
 
 def bcc_mesh_parametric(r_strut, l_rve, n_rve, l_cell, add_plates=True, shape_name="bcc" \

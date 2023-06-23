@@ -10,7 +10,7 @@ try:
 except ModuleNotFoundError:
     print(f"\n\n\t{'-' * 70}\n\tWARNING: It is recommended to install 'seaborn' to get nicer plots.\n\t{'-' * 70}\n\n")
 
-pth_post_process = CollectPaths('post_process.py')
+pth_post_process = CollectPaths('./feniQS/problem/post_process.py')
 pth_post_process.add_script(pth_general)
 pth_post_process.add_script(pth_fenics_functions)
 pth_post_process.add_script(pth_problem)

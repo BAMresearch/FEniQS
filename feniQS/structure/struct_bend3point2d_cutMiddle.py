@@ -1,6 +1,6 @@
 from feniQS.structure.struct_bend3point2d import *
 
-pth_struct_bend3point2d_cutMiddle = CollectPaths('struct_bend3point2d_cutMiddle.py')
+pth_struct_bend3point2d_cutMiddle = CollectPaths('./feniQS/structure/struct_bend3point2d_cutMiddle.py')
 pth_struct_bend3point2d_cutMiddle.add_script(pth_struct_bend3point2d)
 
 class Bend3Point2D_cutMiddle(Bend3Point2D):

@@ -4,7 +4,7 @@ from feniQS.problem.problem import *
 from feniQS.problem.time_stepper import *
 from feniQS.general.yaml_functions import *
 
-pth_model_time_varying = CollectPaths('model_time_varying.py')
+pth_model_time_varying = CollectPaths('./feniQS/problem/model_time_varying.py')
 pth_model_time_varying.add_script(pth_general)
 pth_model_time_varying.add_script(pth_problem)
 pth_model_time_varying.add_script(pth_time_stepper)

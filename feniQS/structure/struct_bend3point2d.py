@@ -4,7 +4,7 @@ from feniQS.structure.helper_mesh_fenics import *
 from feniQS.structure.helper_BCs import *
 from feniQS.structure.helper_loadings import *
 
-pth_struct_bend3point2d = CollectPaths('struct_bend3point2d.py')
+pth_struct_bend3point2d = CollectPaths('./feniQS/structure/struct_bend3point2d.py')
 pth_struct_bend3point2d.add_script(pth_structures_fenics)
 pth_struct_bend3point2d.add_script(pth_fenics_functions)
 pth_struct_bend3point2d.add_script(pth_helper_mesh_fenics)

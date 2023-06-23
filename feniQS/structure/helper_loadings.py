@@ -1,6 +1,6 @@
 from feniQS.fenics_helpers.fenics_expressions import *
 
-pth_helper_loadings = CollectPaths('helper_loadings.py')
+pth_helper_loadings = CollectPaths('./feniQS/structure/helper_loadings.py')
 pth_helper_loadings.add_script(pth_fenics_expressions)
 
 class ParsLoading:

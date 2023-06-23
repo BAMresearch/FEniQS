@@ -1,7 +1,7 @@
 import numpy as np
 from feniQS.material.constitutive import *
 
-pth_constitutive_plastic = CollectPaths('constitutive_plastic.py')
+pth_constitutive_plastic = CollectPaths('./feniQS/material/constitutive_plastic.py')
 pth_constitutive_plastic.add_script(pth_constitutive)
 
 class RateIndependentHistory:

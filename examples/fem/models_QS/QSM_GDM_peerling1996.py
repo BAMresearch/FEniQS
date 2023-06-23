@@ -1,7 +1,7 @@
 from feniQS.problem.QSM_GDM import *
 from feniQS.structure.struct_peerling1996 import *
 
-pth_QSM_GDM_peerling1996 = CollectPaths('QSM_GDM_peerling1996.py')
+pth_QSM_GDM_peerling1996 = CollectPaths('./examples/fem/models_QS/QSM_GDM_peerling1996.py')
 pth_QSM_GDM_peerling1996.add_script(pth_QSM_GDM)
 pth_QSM_GDM_peerling1996.add_script(pth_struct_peerling1996)
 

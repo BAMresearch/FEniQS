@@ -2,7 +2,7 @@ from feniQS.problem.problem import *
 from feniQS.problem.time_stepper import *
 from feniQS.problem.post_process import *
 
-pth_poh2017_compression = CollectPaths('poh2017_compression.py')
+pth_poh2017_compression = CollectPaths('./examples/fem/models_QS/poh2017_compression.py')
 pth_poh2017_compression.add_script(pth_problem)
 pth_poh2017_compression.add_script(pth_time_stepper)
 pth_poh2017_compression.add_script(pth_post_process)

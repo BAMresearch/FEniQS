@@ -4,7 +4,8 @@ import ufl
 
 from feniQS.general.general import CollectPaths
 from feniQS.fenics_helpers.fenics_functions import conditional_by_ufl, pth_fenics_functions
-pth_damage = CollectPaths('damage.py')
+
+pth_damage = CollectPaths('./feniQS/material/damage.py')
 pth_damage.add_script(pth_fenics_functions)
 
 class GKLocalDamageLinear: ### Developed now for numpy usage (NOT dolfin Ufl)

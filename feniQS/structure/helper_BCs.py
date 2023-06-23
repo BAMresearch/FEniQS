@@ -3,7 +3,7 @@ import dolfin as df
 from feniQS.fenics_helpers.fenics_functions import boundary_condition_pointwise, boundary_condition, pth_fenics_functions
 
 from feniQS.general.general import CollectPaths
-pth_helper_BCs = CollectPaths('helper_BCs.py')
+pth_helper_BCs = CollectPaths('./feniQS/structure/helper_BCs.py')
 pth_helper_BCs.add_script(pth_fenics_functions)
 
 def bc_on_middle_3point_bending(x_from, x_to, ly, i_u, u_expr, tol):

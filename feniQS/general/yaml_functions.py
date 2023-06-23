@@ -3,7 +3,7 @@ from feniQS.general.general import CollectPaths
 import numpy as np
 import yaml
 
-pth_yaml_functions = CollectPaths('yaml_functions.py')
+pth_yaml_functions = CollectPaths('./feniQS/general/yaml_functions.py')
 
 def yamlDump_pyObject_toDict(obj, full_name):
     _possible_types = (int, float, dict, list, str, bool, tuple)

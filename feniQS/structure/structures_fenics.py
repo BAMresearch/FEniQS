@@ -1,7 +1,7 @@
 from feniQS.problem.model_time_varying import *
 from feniQS.general.general import *
 
-pth_structures_fenics = CollectPaths('structures_fenics.py')
+pth_structures_fenics = CollectPaths('./feniQS/structure/structures_fenics.py')
 pth_structures_fenics.add_script(pth_model_time_varying)
 
 class StructureFEniCS():

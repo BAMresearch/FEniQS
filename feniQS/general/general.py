@@ -11,15 +11,12 @@ try:
 except ModuleNotFoundError:
     print(f"\n\n\t{'-' * 70}\n\tWARNING: It is recommended to install 'seaborn' to get nicer plots.\n\t{'-' * 70}\n\n")
 
-from pathlib import Path
-ROOT = Path(__file__).parent.parent # The root directory of the whole repository
-
 class CollectPaths:
-    def __init__(self, _name):
-        self.ROOT = ROOT
-        self._name = _name
-        aa = list(self.ROOT.glob("**/" + self._name))
-        self.pths = [a.resolve() for a in aa]
+    def __init__(self, path0):
+        self.path0 = os.path.abspath(path0)
+        if not os.path.isfile(self.path0):
+            raise ValueError(f"The given 'path0 = {path0}' does not point to any file.")
+        self.pths = [self.path0]
     def add_script(self, script_collector):
         for p in script_collector.pths:
             if p not in self.pths:
@@ -50,7 +47,7 @@ class CollectPaths:
                     pths.append(p)
         return pths
 
-pth_general = CollectPaths('general.py')
+pth_general = CollectPaths('./feniQS/general/general.py')
 
 def rotate_points_around_point_2D(XYs, theta, origin=np.array([[0, 0]])):
     """

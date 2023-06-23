@@ -3,7 +3,7 @@ from feniQS.fenics_helpers.fenics_functions import *
 from feniQS.structure.helper_loadings import *
 from feniQS.structure.helper_BCs import ds_at_end_point_of_interval_mesh, pth_helper_BCs
 
-pth_struct_peerling1996 = CollectPaths('struct_peerling1996.py')
+pth_struct_peerling1996 = CollectPaths('./feniQS/structure/struct_peerling1996.py')
 pth_struct_peerling1996.add_script(pth_structures_fenics)
 pth_struct_peerling1996.add_script(pth_fenics_functions)
 pth_struct_peerling1996.add_script(pth_helper_loadings)
