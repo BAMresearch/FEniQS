@@ -1,6 +1,6 @@
 from feniQS.structure.struct_bend3point2d import *
 
-pth_struct_kozicki2013 = CollectPaths('./feniQS/structure/pth_struct_kozicki2013.py')
+pth_struct_kozicki2013 = CollectPaths('./feniQS/structure/struct_kozicki2013.py')
 pth_struct_kozicki2013.add_script(pth_struct_bend3point2d)
 
 class ParsKozicki2013(ParsBend3Point2D):
