@@ -11,11 +11,21 @@ try:
 except ModuleNotFoundError:
     print(f"\n\n\t{'-' * 70}\n\tWARNING: It is recommended to install 'seaborn' to get nicer plots.\n\t{'-' * 70}\n\n")
 
+from pathlib import Path
+ROOT_FEniQS = Path(__file__).parent.parent.parent # The root directory of the whole repository
+
 class CollectPaths:
-    def __init__(self, path0):
-        self.path0 = os.path.abspath(path0)
+    def __init__(self, relative_path, ROOT=ROOT_FEniQS):
+        """
+        relative_path:
+            The relative path of a file w.r.t. the given ROOT.
+        """
+        if relative_path[0]=='.':
+            relative_path = relative_path[1:]
+        self.path0 = os.path.abspath(f"{ROOT}{relative_path}")
         if not os.path.isfile(self.path0):
-            raise ValueError(f"The given 'path0 = {path0}' does not point to any file.")
+            raise ValueError(f"The given 'path0 = {self.path0}' does not point to any file.")
+        self.ROOT = ROOT
         self.pths = [self.path0]
     def add_script(self, script_collector):
         for p in script_collector.pths:
