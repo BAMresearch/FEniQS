@@ -1,5 +1,5 @@
 from feniQS.problem.QSM_GDM import *
-from examples.fem.structures.struct_kozicki2013 import *
+from feniQS.structure.struct_kozicki2013 import *
 
 def revise_pars_gdm_kozicki2013(pars):
     pars.constraint = 'PLANE_STRAIN'
