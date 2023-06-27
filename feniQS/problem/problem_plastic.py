@@ -6,13 +6,49 @@ pth_problem_plastic = CollectPaths('./feniQS/problem/problem_plastic.py')
 pth_problem_plastic.add_script(pth_problem)
 pth_problem_plastic.add_script(pth_fenics_functions)
 pth_problem_plastic.add_script(pth_constitutive_plastic)
-    
+
+class PlasticityPars(ParsBase):
+    def __init__(self, pars0=None, **kwargs):
+        ParsBase.__init__(self, pars0)
+        if len(kwargs)==0: # Default values are set
+            self.constraint = 'UNIAXIAL'
+            # self.constraint = 'PLANE_STRAIN'
+            # self.constraint = 'PLANE_STRESS'
+            # self.constraint     = '3D'
+            
+            self.E_min = 0. # will be added to self.E
+            self.E = 1e3
+            self.nu = 0.2
+            
+            self.mat_type = 'plasticity' # always
+            
+            self.yield_surf = {'type': 'von-mises'}
+            self.yield_surf['pars'] = {'sig0': 10.0}
+            self.hardening_isotropic = {'modulus': 0.}
+            self.hardening_isotropic['hypothesis'] = 'unit' # or 'plastic-work'
+
+            self.el_family = 'CG'
+            self.shF_degree_u = 1
+            self.integ_degree = 2
+            
+            self.softenned_pars = ()
+                # Parameters to be converted from/to FEniCS constant (to be modified more easily)
+            
+            self._write_files = True
+            
+            self.f = None # No body force
+            
+            self.analytical_jac = False # whether 'preparation' is done for analytical computation of Jacobian
+            
+        else: # Get from a dictionary
+            ParsBase.__init__(self, **kwargs)
+
 class FenicsPlastic(FenicsProblem, df.NonlinearProblem):
     def __init__(self, mat, mesh, fen_config, dep_dim=None):
         FenicsProblem.__init__(self, mat, mesh, fen_config, dep_dim)
         df.NonlinearProblem.__init__(self)
     
-    def build_variational_functionals(self, f=None, integ_degree=None):
+    def build_variational_functionals(self, f=None, integ_degree=None, expr_sigma_scale=1.):
         self.hist_storage = 'quadrature' # always is quadrature
         if integ_degree is None:
             integ_degree = self.shF_degree_u + 1
@@ -23,8 +59,11 @@ class FenicsPlastic(FenicsProblem, df.NonlinearProblem):
         from ffc.quadrature.deprecation import QuadratureRepresentationDeprecationWarning
         warnings.simplefilter("once", QuadratureRepresentationDeprecationWarning)
         
-        self.a_Newton = df.inner(eps_vector(self.v, self.mat.constraint), df.dot(self.Ct, eps_vector(self.u_, self.mat.constraint))) * self.dxm
-        self.res = ( df.inner(eps_vector(self.u_, self.mat.constraint), self.sig) - df.inner(f, self.u_) ) * self.dxm
+        self.a_Newton = expr_sigma_scale * df.inner(eps_vector(self.v, self.mat.constraint), df.dot(self.Ct, eps_vector(self.u_, self.mat.constraint))) * self.dxm
+        self.res = expr_sigma_scale * ( df.inner(eps_vector(self.u_, self.mat.constraint), self.sig) - df.inner(f, self.u_) ) * self.dxm
+        ## add Neumann BC. terms (if any exist)
+        for i, t in enumerate(self.bcs_NM_tractions):
+            self.res += df.dot(t, self.v_u) * self.bcs_NM_measures[i]
         
     def discretize(self):
         ### Nodal spaces / functions
@@ -67,16 +106,13 @@ class FenicsPlastic(FenicsProblem, df.NonlinearProblem):
         self.Ct_num = np.tile(self.mat.D.flatten(), self.ngauss).reshape((self.ngauss, self.mat.ss_dim**2)) # initial value is the elastic stiffness at all Gauss-points
         self.Ct.vector().set_local(self.Ct_num.flatten()) # assign the helper "Ct_num" to "Ct"
     
-    def build_solver(self, time_varying_loadings=[], tol=1e-12, solver=None):
+    def build_solver(self, solver_options=None, time_varying_loadings=[]):
         FenicsProblem.build_solver(self, time_varying_loadings)
         self.projector_eps = LocalProjector(eps_vector(self.u, self.mat.constraint), self.i_ss, self.dxm)
-        if len(self.bcs_DR + self.bcs_DR_inhom) == 0:
-            print('WARNING: No boundary conditions have been set to the FEniCS problem.')
         self.assembler = df.SystemAssembler(self.a_Newton, self.res, self.bcs_DR + self.bcs_DR_inhom)
-        if solver is None:
-            solver = df.NewtonSolver()
-            solver.parameters['maximum_iterations'] = 14
-        self.solver = solver
+        if solver_options is None:
+            solver_options = get_fenicsSolverOptions()
+        self.solver = get_nonlinear_solver(solver_options=solver_options, mpi_comm=self.mesh.mpi_comm())
     
     def F(self, b, x):
         # project the corresponding strain to quadrature space
@@ -92,7 +128,8 @@ class FenicsPlastic(FenicsProblem, df.NonlinearProblem):
 
     def solve(self, t=0.0, max_iters=20, allow_nonconvergence_error=True):
         FenicsProblem.solve(self, t)
-        _it, conv = self.solver.solve(self, self.u.vector())
+        _ , u = self.get_F_and_u()
+        _it, conv = self.solver.solve(self, u.vector())
         if conv:
             print(f"    The time step t={t} converged after {_it} iteration(s).")
             self._todo_after_convergence()
@@ -128,13 +165,19 @@ class FenicsPlastic(FenicsProblem, df.NonlinearProblem):
     def _todo_after_convergence(self):
         self.kappa.vector()[:] = self.kappa1
         self.eps_p.vector()[:] = self.eps_p.vector()[:] + self.d_eps_p_num.flatten()
-        
+    
+    def get_i_full(self):
+        return self.i_u
+
     def get_F_and_u(self):
         return self.res, self.u
     
     def get_uu(self):
         return self.u
     
-    def get_i_full(self):
+    def get_iu(self, _collapse=True):
         return self.i_u
     
+    def reset_fields(self, u0=0.0):
+        # u0 can be a vector of the same length as self.u_u
+        self.u.vector()[:] = u0
