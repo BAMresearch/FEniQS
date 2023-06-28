@@ -119,7 +119,7 @@ class Bend3Point2D(StructureFEniCS):
     
     def _build_mesh(self):
         self.embedded_nodes = np.array(self.pars.resolutions['embedded_nodes'])
-        return notched_rectangle_mesh(lx=self.pars.lx, ly=self.pars.ly \
+        mesh = notched_rectangle_mesh(lx=self.pars.lx, ly=self.pars.ly \
                                       , load_Xrange=[self.pars.x_from, self.pars.x_to] \
                                       , l_notch=self.pars.l_notch, h_notch=self.pars.h_notch \
                                       , c_notch=self.pars.left_notch+self.pars.l_notch/2 \
@@ -129,7 +129,8 @@ class Bend3Point2D(StructureFEniCS):
                                       , embedded_nodes=self.embedded_nodes, el_size_max=self.pars.resolutions['el_size_max'] \
                                       , _path=self._path)
         ParsBend3Point2D.set_embedded_nodes(self.pars, self.embedded_nodes) # since self.embedded_nodes might have been adjusted (veryyyyy slightly) in mesh generation process.
-        
+        return mesh
+    
     def _build_structure(self, _build_middle_load=True):
         ### MESH ###
         self.mesh = self._build_mesh()

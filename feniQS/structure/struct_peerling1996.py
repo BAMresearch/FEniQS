@@ -41,12 +41,11 @@ class ParsPeerling(ParsBase):
             self.__dict__.update(kwargs)
 
 class Peerling1996(StructureFEniCS):
-    def __init__(self, pars, embedded_nodes=[], _path=None, _name=None):
+    def __init__(self, pars, _path=None, _name=None):
         if isinstance(pars, dict):
             pars = ParsPeerling(**pars)
         if _name is None:
             _name = 'peerling1996'
-        self.embedded_nodes = embedded_nodes # Should be set before 'StructureFEniCS.__init__', since '_build_structure' is called within 'StructureFEniCS.__init__'.
         StructureFEniCS.__init__(self, pars, _path, _name)
     
     def _build_structure(self):
@@ -56,10 +55,6 @@ class Peerling1996(StructureFEniCS):
         if self.pars._plot:
             plt.figure()
             df.plot(self.mesh)
-            if len(self.embedded_nodes) > 0:
-                plt.plot(self.embedded_nodes[:,0], self.embedded_nodes[:,1], marker='.', fillstyle='none' \
-                         , linestyle='', color='red', label='Embedded nodes')
-                plt.legend()
             plt.title(f"Mesh of '{self._name}'")
             plt.savefig(self._path + 'meshView.png', bbox_inches='tight', dpi=300)
             plt.show()
