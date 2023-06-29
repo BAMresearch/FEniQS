@@ -1,7 +1,7 @@
 from feniQS.general.parameters import *
 from feniQS.problem.problem import *
 
-pth_problem_elastic_homogenized = CollectPaths('./feniQS/problem/pth_problem_elastic_homogenized.py')
+pth_problem_elastic_homogenized = CollectPaths('./feniQS/problem/problem_elastic_homogenized.py')
 pth_problem_elastic_homogenized.add_script(pth_parameters)
 pth_problem_elastic_homogenized.add_script(pth_problem)
 
