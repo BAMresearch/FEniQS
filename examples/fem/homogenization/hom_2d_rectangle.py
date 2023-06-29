@@ -27,7 +27,7 @@ if __name__ == "__main__":
                                                , RVE_boundaries=RVE_boundaries)
     
     ## FEniCS solver
-    so = get_fenicsSolverOptions()
+    so = get_fenicsSolverOptions(case='linear', lin_sol='direct')
     
     ## Solve problem
     hom_problem.build_solver(solver_options=so)

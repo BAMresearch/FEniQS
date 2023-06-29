@@ -212,7 +212,8 @@ if __name__ == "__main__":
     model = get_QSM_GDM(pars_struct=pars_struct, cls_struct=Peerling1996, pars_gdm=pars_gdm)
     
     ## SOLVE OPTIONs
-    solve_options = QuasiStaticSolveOptions(solver_options=get_fenicsSolverOptions())
+    solver_options = get_fenicsSolverOptions(lin_sol='direct')
+    solve_options = QuasiStaticSolveOptions(solver_options=solver_options)
     solve_options.checkpoints = [float(a) for a in (np.arange(2e-1, 1.0, 2e-1))] # this "float" is to be able to properly write "solve_options" into yamlDict file
     solve_options.t_end = model.pars.loading_t_end
     solve_options.dt = 0.01

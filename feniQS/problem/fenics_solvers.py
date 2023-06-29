@@ -3,86 +3,141 @@ from feniQS.general.general import CollectPaths
 
 pth_fenics_solvers = CollectPaths('./feniQS/problem/fenics_solvers.py')
 
-def get_fenicsSolverOptions():
+def get_fenicsSolverOptions(case='nonlinear', lin_sol='default'):
+    nln_so = None # By default, NO need for nonlinear solver options
+    if case.lower()=='nonlinear' or case.lower()=='nln':
+        nln_so = get_nonlinear_solver_options()
+    
+    if lin_sol.lower()=='default' or lin_sol.lower()=='direct':
+        if nln_so is None:
+            lin_so = get_default_linear_solver_options()
+        else:
+            lin_so = 'default' # For now: a default linear solver nested in a nonlinear solver cannot adopt any specifications.
+    elif lin_sol.lower()=='iterative' or lin_sol.lower()=='krylov':
+        lin_so = get_Krylov_solver_options()
+    else:
+        raise ValueError(f"The given linear solver '{lin_sol}' is not recognized. Possible choices are: 'default', 'direct', 'iterative', 'krylov'.")
+
     return {
-    'max_iters': 14,
-    'allow_nonconvergence_error': False,
-    'type': "newton",
-    'tol_abs': 1e-10,
-    'tol_rel': 1e-10,
-    'lin_sol': 'default', # direct solver
-        # The following two are relevant only if lin_sol=='iterative' or 'krylov'
-    'krylov_method': "gmres",
-    'krylov_precon': "default",
+    'nln_sol_options': nln_so,
+    'lin_sol_options': lin_so,
     }
 
+def get_default_linear_solver_options():
+    # NOT effective when having a nonlinear solver (see 'get_fenicsSolverOptions' above)
+    return {
+    'type': 'default (direct)',
+    'max_iters': 10,
+    'allow_nonconvergence_error': False,
+    'tol_abs': 1e-10,
+    'tol_rel': 1e-10,
+    }
+
+def get_Krylov_solver_options():
+    """
+    Options/parameters regarding a dolfin.KrylovSolver solver.
+    """
+    return {
+    'type': 'iterative (krylov)',
+    'max_iters': 10000,
+    'allow_nonconvergence_error': False,
+    'tol_abs': 1e-10, # NOT effective when having a nonlinear solver (see 'get_nonlinear_solver' below)
+    'tol_rel': 1e-8,
+    'method': "gmres",
+    'precon': "default",
+    }
+
+def get_nonlinear_solver_options():
+    return {
+    'type': "newton",
+    'max_iters': 14,
+    'allow_nonconvergence_error': False,
+    'tol_abs': 1e-10,
+    'tol_rel': 1e-10,
+    }
+
+def is_default_lin_sol_options(lin_so):
+    """
+    'lin_so': Any given 'linear solver options'.
+    This returns a boolean saying whether the given 'lin_so' regards to 'default' ('direct') solver or not.
+    """
+    if isinstance(lin_so, str):
+        if 'default' in lin_so.lower() or 'direct' in lin_so.lower():
+            bb = True
+        else:
+            raise ValueError(f"The given linear solver options '{lin_so}' is not recognized. Valid options are: 'default', 'direct'.")
+    else: # must be dictionary
+        if not isinstance(lin_so, dict):
+            raise ValueError(f"The given linear solver options must be a dictionary (if not being either 'default' or 'direct').")
+        _type = lin_so['type']
+        if 'default' in _type.lower() or 'direct' in _type.lower():
+            bb = True
+        elif 'iterative' in _type.lower() or 'krylov' in _type.lower():
+            bb = False
+        else:
+            raise ValueError(f"The given linear solver options has unrecognized type='{_type}'. Valid types are: 'default', 'direct', 'iterative', 'krylov'.")
+    return bb
+
 def get_nonlinear_solver(solver_options, mpi_comm):
-    allow_nonconvergence_error = solver_options['allow_nonconvergence_error']
-    max_iters = solver_options['max_iters']
-    s = solver_options['type']
-    tol_abs = solver_options['tol_abs']
-    tol_rel = solver_options['tol_rel']
-    lin_sol = solver_options['lin_sol']
-    bb = ('default' in lin_sol.lower()) or ('direct' in lin_sol.lower()) # direct/default solver
+    nln_so = solver_options['nln_sol_options']
+    lin_so = solver_options['lin_sol_options']
+    bb = is_default_lin_sol_options(lin_so)
     
-    if 'newton' in s.lower():
+    if 'newton' in nln_so['type'].lower():
         if bb:
-            solver = df.NewtonSolver() # A linear solver can calso be specified as input to that.
-        else: # 'iterative'
-            method = solver_options['krylov_method']
-            pc = solver_options['krylov_precon']
+            solver = df.NewtonSolver() # With all default options for the linear solver.
+            ## ?: how to adjust only tolerances and other options of the underlying LINEAR solver.
+        else: # iterative (Krylove)
+            assert ('iterative' in lin_so['type'].lower()) or ('krylov' in lin_so['type'].lower())
+            method = lin_so['method']
+
+            pc = df.PETScPreconditioner(lin_so['precon'])
             lin_solver = df.PETScKrylovSolver(method, pc)
+                ## OR:
+            # lin_solver = df.PETScKrylovSolver(method, lin_so['precon'])
             
-            lin_solver.parameters['error_on_nonconvergence'] = allow_nonconvergence_error
-            lin_solver.parameters['maximum_iterations'] = max_iters
-            lin_solver.parameters['relative_tolerance'] = tol_rel
-            lin_solver.parameters['absolute_tolerance'] = tol_abs
+            lin_solver.parameters['error_on_nonconvergence'] = lin_so['allow_nonconvergence_error']
+            lin_solver.parameters['maximum_iterations'] = lin_so['max_iters']
+            lin_solver.parameters['relative_tolerance'] = lin_so['tol_rel']
+            ## NOTE: The following absolute_tolerance would apparently hinder the convergence of the linear solver!
+            # lin_solver.parameters['absolute_tolerance'] = lin_so['tol_abs']
             # lin_solver.parameters['monitor_convergence'] = True
             # lin_solver.parameters['nonzero_initial_guess'] = True
             
-            solver = NewtonSolverFromLinearSolver(mpi=mpi_comm, lin_solver=lin_solver)
-            
-            ### The following seems to work too,
-                # however, it is not obvious how the matrix 'A' of Newton-iteration is assigned to liner-solver's A matrix.
-                # Maybe this is just automatically done !?
-            # solver = df.NewtonSolver(mpi_comm, lin_solver, df.PETScFactory.instance())
+            # NOTE: It is not obvious how the matrix 'A' of Newton-iteration is assigned to liner-solver's A matrix.
+                  # But it seems that, this is just automatically handled by FEniCS.
+            solver = df.NewtonSolver(mpi_comm, lin_solver, df.PETScFactory.instance())
         
-    elif 'snes' in s.lower():
+    elif 'snes' in nln_so['type'].lower():
         if bb:
-            solver = df.PETScSNESSolver()
+            solver = df.PETScSNESSolver() # With all default options for the linear solver.
+            ## ?: how to adjust only tolerances and other options of the underlying LINEAR solver.
         else:
             raise NotImplementedError(f"Iterative linear solver together with 'snes' solver is not implemented.")
     else:
-        raise KeyError(f"The solver type '{s}' is not recognized.")
-    solver.parameters["absolute_tolerance"] = tol_abs
-    solver.parameters["relative_tolerance"] = tol_rel
-    solver.parameters["error_on_nonconvergence"] = allow_nonconvergence_error
-    solver.parameters["maximum_iterations"] = max_iters
+        raise KeyError(f"The nonlinear solver type '{nln_so['type']}' is not recognized.")
+
+    solver.parameters["absolute_tolerance"] = nln_so['tol_abs']
+    solver.parameters["relative_tolerance"] = nln_so['tol_rel']
+    solver.parameters["error_on_nonconvergence"] = nln_so['allow_nonconvergence_error']
+    solver.parameters["maximum_iterations"] = nln_so['max_iters']
 
     return solver
 
-class NewtonSolverFromLinearSolver(df.NewtonSolver):
-    def __init__(self, mpi, lin_solver):
-        df.NewtonSolver.__init__(self, mpi, lin_solver, df.PETScFactory.instance())
-    
-    def solver_setup(self, A, P, problem, iteration):
-        self.linear_solver().set_operator(A)
-
 class MyKrylovSolver:
-    def __init__ (self, method = 'cg', precond = 'default', tol_a = 1e-12, tol_r = 1e-12, max_iter=200):
+    def __init__ (self, method = 'cg', precond = 'default' \
+                  , tol_a = 1e-12, tol_r = 1e-12, max_iter=200):
         assert df.has_krylov_solver_method(method)
         assert df.has_krylov_solver_preconditioner(precond)
         
-        self.method     = method
-        self.precond    = precond
-        self.tol_a      = tol_a
-        self.tol_r      = tol_r
-        self.max_iter   = max_iter
-        
-        self.solver = df.KrylovSolver(self.method, self.precond)
-        self.solver.parameters['absolute_tolerance'] = self.tol_a
-        self.solver.parameters['relative_tolerance'] = self.tol_r
-        self.solver.parameters['maximum_iterations'] = self.max_iter
+        pc = df.PETScPreconditioner(precond)
+        self.solver = df.PETScKrylovSolver(method, pc)
+            ## OR:
+        # self.solver = df.PETScKrylovSolver(method, self.precond)
+
+        self.solver.parameters['absolute_tolerance'] = tol_a
+        self.solver.parameters['relative_tolerance'] = tol_r
+        self.solver.parameters['maximum_iterations'] = max_iter
     
     def __call__(self, u):
         if (hasattr(self, 'A') & hasattr(self, 'b')):

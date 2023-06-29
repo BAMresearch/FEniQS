@@ -348,32 +348,37 @@ class FenicsElastic(FenicsProblem):
     def build_solver(self, solver_options=None, time_varying_loadings=[]):
         FenicsProblem.build_solver(self, time_varying_loadings)
         if solver_options is None:
-            solver_options = get_fenicsSolverOptions()
-        self.solver_options = solver_options
-        if self.solver_options['lin_sol']=="direct" or self.solver_options['lin_sol']=="default":
+            solver_options = get_fenicsSolverOptions(case='linear')
+        if solver_options['nln_sol_options'] is not None:
+            print(f"WARNING: The nonlinear solver options are ignored (set to None) in building the solver of the Elastic problem.")
+            solver_options['nln_sol_options'] = None
+        lin_so = solver_options['lin_sol_options']
+        self.is_default_lin_sol = is_default_lin_sol_options(lin_so)
+        if self.is_default_lin_sol:
             problem = df.LinearVariationalProblem(a=self.K_t_form, L=self.L_u, u=self.u_u, bcs=self.bcs_DR + self.bcs_DR_inhom)
             self.solver = df.LinearVariationalSolver(problem)
-            self.solver.parameters['krylov_solver']["maximum_iterations"] = solver_options['max_iters']
-            self.solver.parameters['krylov_solver']["absolute_tolerance"]   = self.solver_options['tol_abs']
-            self.solver.parameters['krylov_solver']["relative_tolerance"]   = self.solver_options['tol_rel']
+            self.solver.parameters['krylov_solver']["maximum_iterations"] = lin_so['max_iters']
+            self.solver.parameters['krylov_solver']["absolute_tolerance"]   = lin_so['tol_abs']
+            self.solver.parameters['krylov_solver']["relative_tolerance"]   = lin_so['tol_rel']
+            self.solver.parameters['krylov_solver']["error_on_nonconvergence"]   = lin_so['allow_nonconvergence_error']
             # self.solver.parameters['lu_solver']["verbose"] = True
                         
-        elif self.solver_options['lin_sol']=="iterative":
-            if not (df.has_krylov_solver_method(self.solver_options['krylov_method']) or
-                    df.has_krylov_solver_preconditioner(self.solver_options['krylov_precon'])):
+        else:
+            if not (df.has_krylov_solver_method(lin_so['method']) or
+                    df.has_krylov_solver_preconditioner(lin_so['precon'])):
                 raise ValueError(f"Invalid parameters are given for krylov solver.")
-            self.solver = MyKrylovSolver(method  = solver_options['krylov_method'],
-                                         precond = solver_options['krylov_precon'],
-                                         tol_a   = solver_options['tol_abs'],
-                                         tol_r   = solver_options['tol_rel'],
-                                         max_iter= solver_options['max_iters'])    
+            self.solver = MyKrylovSolver(method  = lin_so['method'],
+                                         precond = lin_so['precon'],
+                                         tol_a   = lin_so['tol_abs'],
+                                         tol_r   = lin_so['tol_rel'],
+                                         max_iter= lin_so['max_iters'])    
     def solve(self, t):
         FenicsProblem.solve(self, t)
-        if self.solver_options['lin_sol']=="direct" or self.solver_options['lin_sol']=="default":
+        if self.is_default_lin_sol:
             self.solver.solve()
             conv = True
             _it = 0
-        elif self.solver_options['lin_sol']=="iterative":
+        else:
             try:
                 self.solver.assemble(self.K_t_form, self.L_u, self.bcs_DR + self.bcs_DR_inhom)
                 self.solver(self.u_u)

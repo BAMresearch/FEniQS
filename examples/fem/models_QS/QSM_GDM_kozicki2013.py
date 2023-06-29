@@ -102,11 +102,7 @@ if __name__ == "__main__":
     model = get_QSM_GDM(pars_struct=pars_struct, cls_struct=Kozicki2013, pars_gdm=pars_gdm)
     
     ## SOLVE OPTIONs
-    solver_options = get_fenicsSolverOptions() # regarding a single load-step
-    solver_options['tol_abs'] = 1e-10
-    solver_options['tol_rel'] = 1e-10
-    # solver_options['type'] = 'snes'
-    # solver_options['lin_sol'] = 'iterative'
+    solver_options = get_fenicsSolverOptions(lin_sol='direct') # regarding a single load-step
     solve_options = QuasiStaticSolveOptions(solver_options) # regarding incremental solution
     solve_options.checkpoints = [float(a) for a in (np.arange(1e-1, 1.0, 1e-1))] # this "float" is to be able to properly write "solve_options" into yamlDict file
     solve_options.t_end = model.pars.loading_t_end

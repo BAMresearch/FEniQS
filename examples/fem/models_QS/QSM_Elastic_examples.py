@@ -42,11 +42,11 @@ if __name__ == "__main__":
 #     SOLVE & PP (post-processing)
 # =============================================================================
     ## (SOLVE & SOLVER) OPTIONs
-    solver_options = get_fenicsSolverOptions()
-    solver_options['lin_sol']       = 'iterative'
-    solver_options['max_iters']     = 1000
-    solver_options['krylov_method'] = 'cg'
-    solver_options['krylov_precon'] = 'default'
+    solver_options = get_fenicsSolverOptions(case='linear', lin_sol='iterative')
+    solver_options['lin_sol_options']['method'] = 'cg'
+    solver_options['lin_sol_options']['precon'] = 'default'
+    solver_options['lin_sol_options']['tol_abs'] = 1e-10
+    solver_options['lin_sol_options']['tol_rel'] = 1e-10
     
     solve_options = QuasiStaticSolveOptions(solver_options=solver_options)
     n_ch = 2

@@ -75,11 +75,7 @@ if __name__ == "__main__":
     model_plastic = get_QSM_Plasticity(pars_struct, CantileverBeam2D, pars_plastic)
 
     ## SOLVE OPTIONs
-    solver_options = get_fenicsSolverOptions() # regarding a single load-step
-    solver_options['tol_abs'] = 1e-10
-    solver_options['tol_rel'] = 1e-10
-    # solver_options['type'] = 'snes'
-    # solver_options['lin_sol'] = 'iterative'
+    solver_options = get_fenicsSolverOptions(lin_sol='direct') # regarding a single load-step
     solve_options = QuasiStaticSolveOptions(solver_options) # regarding incremental solution
     solve_options.t_end = model_plastic.pars.loading_t_end
     solve_options.dt = 0.01

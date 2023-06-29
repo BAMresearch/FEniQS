@@ -34,11 +34,7 @@ if __name__ == "__main__":
     model = get_QSM_GDM(pars_struct=pars_struct, cls_struct=Slab2D, pars_gdm=pars_gdm)
     
     ## SOLVE OPTIONs
-    solver_options = get_fenicsSolverOptions() # regarding a single load-step
-    solver_options['tol_abs'] = 1e-10
-    solver_options['tol_rel'] = 1e-10
-    # solver_options['type'] = 'snes'
-    # solver_options['lin_sol'] = 'iterative'
+    solver_options = get_fenicsSolverOptions(lin_sol='iterative') # regarding a single load-step
     solve_options = QuasiStaticSolveOptions(solver_options) # regarding incremental solution
     n_ch = 10
     solve_options.checkpoints = [float(a) for a in (np.arange(1./n_ch, 1.0, 1./n_ch))]
