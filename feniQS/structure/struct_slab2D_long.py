@@ -22,6 +22,8 @@ class ParsSlab2DLong(ParsSlab2D):
             ## MESH
             self.res_x = 100
             self.res_y = 10
+            self.el_size_max = None
+            self.el_size_min = None
             embedded_nodes = []
             ParsSlab2D.set_embedded_nodes(self, embedded_nodes)
 

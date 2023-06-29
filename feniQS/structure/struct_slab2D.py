@@ -19,6 +19,8 @@ class ParsSlab2D(ParsBase):
             ## MESH
             self.res_x = 1
             self.res_y = 1
+            self.el_size_max = None
+            self.el_size_min = None
             embedded_nodes = [[0.25, 0.5], [0.5, 0.25], [0.75, 0.5], [0.5, 0.75]]
             ParsSlab2D.set_embedded_nodes(self, embedded_nodes)
             
@@ -76,7 +78,9 @@ class Slab2D(StructureFEniCS):
         self.embedded_nodes = np.array(self.pars.embedded_nodes)
         mesh = slab2D_mesh(lx=self.pars.lx, ly=self.pars.ly \
                            , res_x=self.pars.res_x, res_y=self.pars.res_y
-                           , embedded_nodes=self.embedded_nodes, _path=self._path)
+                           , embedded_nodes=self.embedded_nodes \
+                           , el_size_min=self.pars.el_size_min, el_size_max=self.pars.el_size_max \
+                           , _path=self._path)
         ParsSlab2D.set_embedded_nodes(self.pars, self.embedded_nodes) # since self.embedded_nodes might have been adjusted (veryyyyy slightly) in mesh generation process.
         return mesh
 

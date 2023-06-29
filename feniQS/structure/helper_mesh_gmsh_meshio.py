@@ -125,7 +125,7 @@ def gmshAPI_generate_bcc_lattice(r_strut      = 0.5,
     
     return ff_msh
 
-def gmshAPI_slab2D_mesh(lx, ly, res_x, res_y, embedded_nodes \
+def gmshAPI_slab2D_mesh(lx, ly, res_x, res_y, embedded_nodes, el_size_min=None, el_size_max=None \
                         , _path='./', _name='slab2D', write_geo=False):
     ## PARAMETERs
     geo_dim = 2
@@ -177,6 +177,10 @@ def gmshAPI_slab2D_mesh(lx, ly, res_x, res_y, embedded_nodes \
     plane_tags.append(_this.addPlaneSurface(curve_tags))
 
     # Set resolutions
+    l_sides = ly / res_y
+    if el_size_max is not None:
+        l_sides = min(l_sides, el_size_max)
+        res_y = int(ly / l_sides)
     A = gmsh.model.mesh
     _this.synchronize() # Crucial to first call 'synchronize'.
     phy_g = gmsh.model.addPhysicalGroup(geo_dim, plane_tags)
@@ -186,8 +190,56 @@ def gmshAPI_slab2D_mesh(lx, ly, res_x, res_y, embedded_nodes \
     A.setTransfiniteCurve(ls_tags[2], res_x+1, coef=1)
     A.setTransfiniteCurve(ls_tags[3], res_y+1, coef=1)
 
+    if el_size_max is not None:
+        gmsh.option.setNumber("Mesh.CharacteristicLengthMax", el_size_max)
+    if el_size_min is not None:
+        gmsh.option.setNumber("Mesh.CharacteristicLengthMin", el_size_min)
+
     ## EMBEDED NODEs ##
     if len(embedded_ps_tags)>0:
+
+        ### We need to force proper mesh sizes around embedded points
+        
+            ## Desired mesh size around any embedded nodes
+            # VERSION-1 (better)
+        A.generate(geo_dim)
+        el_tags_of_embedded_nodes = [A.getElementsByCoordinates(n[0], n[1], 0)[0] for n in embedded_nodes]
+        embedded_nodes_reses = (3.0 * A.getElementQualities(el_tags_of_embedded_nodes, 'volume')) ** 0.5 # ? Not clear whhy this gives best estimation of mesh size given element volume.
+        A.clear()
+            # VERSION-2 (sub-optimal)
+        # factors_y = len(embedded_nodes) * [1.] # no effect of y-coordinates
+        # # factors_y = [( 0.5 / scale - 1.) * (1. - abs(n[1] - ly/2.) / (ly/2.)) + 1. for n in embedded_nodes]
+        # embedded_nodes_reses = [(scale ** ( 1. - abs(n[0]-lx/2) / (lx/2) ) ) * l_sides \
+        #                         * factors_y[ni] for ni, n in enumerate(embedded_nodes)]
+        
+            ## Minimum distance of any other embedded node to each embedded node
+        embedded_nodes_min_dists = [np.linalg.norm(n - np.delete(embedded_nodes, [ni], axis=0), axis = 1).min() for ni, n in enumerate(embedded_nodes)]
+            
+            ## Minimum distance among (minimum) distances of individual embedded nodes to the sides
+        min_dists_to_sides = [min(n[0], lx - n[0]) for n in embedded_nodes]
+        min_dist_to_sides = min(min_dists_to_sides)
+        
+            ## Set mesh fields
+        A2 = A.field
+        tag_f_thrs = [] # list of tags of all threshold fields
+        for ip in range(len(embedded_ps_tags)):
+            tag_f_d = A2.add('Distance')
+            A2.setNumbers(tag_f_d, 'PointsList', [embedded_ps_tags[ip]])
+            # Each threshold field
+            tag_f_thr = A2.add('Threshold')
+            A2.setNumber(tag_f_thr, 'InField', tag_f_d)
+            A2.setNumber(tag_f_thr, 'SizeMin', embedded_nodes_reses[ip])
+            A2.setNumber(tag_f_thr, 'DistMin', embedded_nodes_min_dists[ip])
+            A2.setNumber(tag_f_thr, 'SizeMax', l_sides) # the largest mesh size (at sides)
+            A2.setNumber(tag_f_thr, 'DistMax', min_dist_to_sides)
+            tag_f_thrs.append(tag_f_thr)
+        # Minimum field among all threshold fields defined above
+        tag_f_min = A2.add('Min')
+        A2.setNumbers(tag_f_min, 'FieldsList', tag_f_thrs)
+        
+            ## Set Background mesh based on minimum field established above
+        A2.setAsBackgroundMesh(tag_f_min)
+
         A.embed(0, embedded_ps_tags, geo_dim, plane_tags[0])
     
     ## MESHING

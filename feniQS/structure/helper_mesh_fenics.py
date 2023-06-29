@@ -15,10 +15,12 @@ def bcc_mesh_parametric(r_strut, l_rve, n_rve, l_cell, add_plates=True, shape_na
         ff.read(mesh)
     return mesh
 
-def slab2D_mesh(lx, ly, res_x, res_y, embedded_nodes, _path, _name='slab2D'):
+def slab2D_mesh(lx, ly, res_x, res_y, embedded_nodes, el_size_min=None, el_size_max=None \
+                , _path='./', _name='slab2D'):
     ## Use Gmsh-API and meshio
     ff_msh = gmshAPI_slab2D_mesh(lx=lx, ly=ly, res_x=res_x, res_y=res_y \
-                                 , embedded_nodes=embedded_nodes, _path=_path, _name=_name)
+                                 , embedded_nodes=embedded_nodes, el_size_min=el_size_min, el_size_max=el_size_max \
+                                , _path=_path, _name=_name)
     ff_xdmf = meshio_get_xdmf_from_msh(ff_msh, path_xdmf=_path, f_xdmf=_name+'.xdmf', geo_dim=2)
     mesh = df.Mesh()
     with df.XDMFFile(ff_xdmf) as ff:
