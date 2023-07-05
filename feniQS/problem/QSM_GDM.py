@@ -151,9 +151,9 @@ class QSModelGDM(QuasiStaticModel):
                 elif geo_dim==2:
                     plt.plot(Ps_Dirichlet[:,0], Ps_Dirichlet[:,1], label='Dirichlet DOFs', linestyle='', marker='P', fillstyle='none')
                     plt.plot(Ps_free[:,0], Ps_free[:,1], label='Free DOFs', linestyle='', marker='.')
-            plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-            plt.savefig(f"{_path_extended}free_and_Dirichlet_DOFs.png", bbox_inches='tight', dpi=400)
-            plt.show()
+                plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+                plt.savefig(f"{_path_extended}free_and_Dirichlet_DOFs.png", bbox_inches='tight', dpi=400)
+                plt.show()
 
         pp0 = model_solved.pps[0]
         Us_free = np.atleast_3d(pp0.eval_checked_u(Ps_free))
@@ -175,8 +175,17 @@ class QSModelGDM(QuasiStaticModel):
         model_solved.build_solver(solve_options)
         model_solved.solve(solve_options)
 
+        res0 = np.array(pp_res.checked)
+        res_reaction = copy.deepcopy(model_solved.pps[0].eval_checked_reaction_forces())
+        if _plot:
+            plt.figure()
+            plt.plot(res0.flatten(), linestyle='', marker='.')
+            plt.xlabel('Free DOF')
+            plt.ylabel('F')
+            plt.title('Force residuals (internal forces) at free DOFs\nafter imposing solved displacements')
+            plt.savefig(f"{_path_extended}residuals_at_free_DOFs.png", bbox_inches='tight', dpi=400)
+            plt.show()
+        
         model_solved._path = model_path # set back
 
-        res0 = np.array(pp_res.checked)
-
-        return res0
+        return res0, res_reaction, _path_extended

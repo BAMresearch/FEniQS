@@ -48,8 +48,8 @@ if __name__=='__main__':
 
     qsm_path_impose = f"{_path}QSM_impose/"
     model._path = qsm_path_impose
-    res0 = QSModelGDM.solve_by_imposing_displacements_at_free_DOFs( \
-        model_solved=model, solve_options=solve_options, _plot=True)
+    res0, res_reaction, _path_extended = QSModelGDM.solve_by_imposing_displacements_at_free_DOFs( \
+                                        model_solved=model, solve_options=solve_options, _plot=True)
     K_checked_impose = copy.deepcopy(np.array(pp_K.checked))
     ts_impose = copy.deepcopy(model.pps[0].ts)
     Fs_impose = model.pps[0].plot_reaction_forces(reaction_places)
@@ -63,11 +63,11 @@ if __name__=='__main__':
     plt.savefig(f"{qsm_path_impose}free_residuals.png", bbox_inches='tight', dpi=400)
     plt.show()
 
-    for i,f_difect in enumerate(Fs_direct):
+    for i,f_direct in enumerate(Fs_direct):
         f_impose = Fs_impose[i]
         rp = reaction_places[i]
         fig = plt.figure()
-        plt.plot(ts_direct, f_difect, marker='.', label='Direct solution')
+        plt.plot(ts_direct, f_direct, marker='.', label='Direct solution')
         plt.plot(ts_impose, f_impose, marker='o', fillstyle='none', label='Solved by imposed displacements')
         plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.title(f"Reaction force at {rp}")
