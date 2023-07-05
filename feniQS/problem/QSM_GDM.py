@@ -118,11 +118,20 @@ class QSModelGDM(QuasiStaticModel):
                                                      , path_extension='', _plot=False):
         """
         IMPORTANT:
-        - The input model must have been solved, since the solved displacements are used / imposed.
-        - The displacements at free DOFs are imposed as extra Dirichlet BC.
-        This method returns the evaluation of force residuals (internal forces) at free DOFs.
+        - The input model must have been solved, since the solved displacements of that
+            are used for being imposed to the same model.
+        - The displacements only at free DOFs are imposed as extra Dirichlet BC.
+        - The original BCs of the model remain untouched.
+        - Calling this method modifies the model; e.g. the BCs and postprocessors.
+        
+        This method returns:
+            - force residuals (internal forces) at free DOFs,
+            - force residuals (internal forces) at reaction places,
+            - the path of the stored results from the solution by imposition.
         """
-        print(f"\n------ QS-MODEL (WARNING):\n\t\tThe called method 'solve_by_imposing_displacements_at_free_DOFs' modifies the model; e.g. the BCs and postprocessors.\n------")
+        _msg = f"\n------ QS-MODEL (WARNING):\n\t\tCalling the method 'solve_by_imposing_displacements_at_free_DOFs'"
+        _msg += f" modifies the model; e.g. the BCs and postprocessors.\n------"
+        print(_msg)
         fen = model_solved.fen
         i_full = fen.get_i_full()
         i_u = fen.get_iu()
