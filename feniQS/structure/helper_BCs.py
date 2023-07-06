@@ -113,10 +113,10 @@ def load_and_bcs_on_3point_bending(mesh, lx, ly, x_from, x_to, i_u, u_expr \
 
 def ds_on_rectangle_mesh(mesh, x_from, x_to, y_from, y_to):
     tol = mesh.rmin() / 1000.
-    def middle_top(x, on_boundary):
+    def rectangle(x, on_boundary):
         return on_boundary and df.between(x[0], (x_from - tol, x_to + tol)) \
                 and df.between(x[1], (y_from - tol, y_to + tol))
-    dom = df.AutoSubDomain(middle_top)
+    dom = df.AutoSubDomain(rectangle)
     mf = df.MeshFunction('size_t', mesh, 1) # 1 goes to edges
     mf.set_all(0)
     dom.mark(mf, 1)
