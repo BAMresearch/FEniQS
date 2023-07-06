@@ -634,8 +634,8 @@ def contour_plot_2d_irregular(xs, ys, zs, res=0.5, _tits=['Title'], xl='', yl=''
         # Create grid values
         x0 = min(x); x1 = max(x)
         y0 = min(y); y1 = max(y)
-        ngridx = int(round(res * (x1-x0)))
-        ngridy = int(round(res * (y1-y0)))
+        ngridx = max(2, int(round(res * (x1-x0))))
+        ngridy = max(2, int(round(res * (y1-y0))))
         xi = np.linspace(x0, x1, )
         yi = np.linspace(y0, y1, ngridy)
         
