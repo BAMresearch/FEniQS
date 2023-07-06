@@ -2,12 +2,14 @@ from feniQS.structure.structures_fenics import *
 from feniQS.structure.helper_mesh_fenics import *
 from feniQS.fenics_helpers.fenics_functions import *
 from feniQS.structure.helper_loadings import *
+from feniQS.structure.helper_BCs import *
 
 pth_struct_slab2d = CollectPaths('./feniQS/structure/struct_slab2D.py')
 pth_struct_slab2d.add_script(pth_structures_fenics)
 pth_struct_slab2d.add_script(pth_helper_mesh_fenics)
 pth_struct_slab2d.add_script(pth_fenics_functions)
 pth_struct_slab2d.add_script(pth_helper_loadings)
+pth_struct_slab2d.add_script(pth_helper_BCs)
 
 class ParsSlab2D(ParsBase):
     def __init__(self, **kwargs):
@@ -120,8 +122,10 @@ class Slab2D(StructureFEniCS):
         
         bcs_DR, bcs_DR_inhom = {}, {}
         
-        bc_left, bc_left_dofs = boundary_condition(i_u, df.Constant((0.0, 0.0)), _left)
-        bcs_DR.update({'left': {'bc': bc_left, 'bc_dofs': bc_left_dofs}})
+        bc_left_x, bc_left_x_dofs = boundary_condition(i_u.sub(0), df.Constant(0.0), _left)
+        bcs_DR.update({'left_x': {'bc': bc_left_x, 'bc_dofs': bc_left_x_dofs}})
+        bc_left_y, bc_left_y_dofs = boundary_condition(i_u.sub(1), df.Constant(0.0), _left)
+        bcs_DR.update({'left_y': {'bc': bc_left_y, 'bc_dofs': bc_left_y_dofs}})
         
         if self.u_x is not None:
             def _right(x, on_boundary):
@@ -151,8 +155,20 @@ class Slab2D(StructureFEniCS):
     def get_tractions_and_dolfin_measures(self):
         ts = [] # Tractions
         dss = [] # Measures
+        if self.f_x is not None:
+            f_0 = df.Constant(0.0)
+            ts.append(df.as_tensor((self.f_x, f_0)))
+            dss.append(ds_on_rectangle_mesh(self.mesh, x_from=self.pars.lx, x_to=self.pars.lx \
+                                            , y_from=0., y_to=self.pars.ly))
         return ts, dss
     
+    def get_tractions_dofs(self, i_full, i_u):
+        dofs = []
+        if self.f_x is not None:
+            nodes = self.get_reaction_nodes(['right'])[0]
+            dofs = dofs_at(points=nodes, V=i_full, i=i_u.sub(0)) # in x-direction
+        return dofs
+
     def switch_loading_control(self, loading_control, load=None):
         """
         loading_control:
