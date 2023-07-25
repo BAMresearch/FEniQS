@@ -50,7 +50,11 @@ class ParsBase:
             self.__dict__.update(pars0.__dict__)
     def get_copy(self):
         _cls = self.__class__
-        return _cls(**self.__dict__)
+        import copy
+        return _cls(**copy.deepcopy(self.__dict__))
+            # It is crucial to make copy of dictionary items of the original object (self), otherwise,
+            # some attributes (ditionary values) with types such as dictionary would not be copied,
+            # instead, the same (dictionary) object would attribute to the self's copy that we create here.
     def yamlDump_toDict(self, _path, _name='parameters'):
         yamlDump_pyObject_toDict(self.get_hardened_dict(), _path + _name + '.yaml')
     def soften(self, softenned_pars_list):
