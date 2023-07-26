@@ -149,6 +149,7 @@ def plot_expression_of_t(expr, t0, t_end, ts=None, _res=1000, lab_x='t', lab_y='
     except ModuleNotFoundError:
         print(f"\n\n\t{'-' * 70}\n\tWARNING: It is recommended to install 'seaborn' to get nicer plots.\n\t{'-' * 70}\n\n")
     ts, us = evaluate_expression_of_t(expr, t0=t0, t_end=t_end, ts=ts, _res=_res)
+    plt.figure()
     plt.plot(ts, us, marker=marker, linestyle=linestyle)
     plt.title(_tit, fontsize=sz)
     plt.xlabel(lab_x, fontsize=sz)
