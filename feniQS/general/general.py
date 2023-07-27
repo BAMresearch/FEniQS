@@ -39,12 +39,12 @@ class CollectPaths:
     def merge_pths(list_of_pths):
         assert isinstance(list_of_pths, list)
         assert all([isinstance(p, list) for p in list_of_pths])
-        pths = []
+        paths = []
         for pths in list_of_pths:
             for p in pths:
-                if p not in pths:
-                    pths.append(p)
-        return pths
+                if p not in paths:
+                    paths.append(p)
+        return paths
 
     @staticmethod
     def merge_pths_of_collectors(collectors):
