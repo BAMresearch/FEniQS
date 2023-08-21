@@ -2,6 +2,7 @@ from feniQS.structure.helper_mesh_gmsh_meshio import *
 
 if __name__=='__main__':
     _path = './examples/fem/mesh/gmsh_meshes/rectangle_mesh/'
+    _name = 'notched_rectangle'
     lx=320
     ly=80
     embedded_nodes = []
@@ -10,9 +11,9 @@ if __name__=='__main__':
             embedded_nodes.append([x, y])
     embedded_nodes = np.array(embedded_nodes)
     ff_msh = gmshAPI_notched_rectangle_mesh(lx=lx, ly=ly, l_notch=8, h_notch=18, el_size_max=(320-40)/20/2 \
-                                            , left_sup=10., right_sup=310., embedded_nodes=embedded_nodes, _path=_path)
-    f_xdmf = 'notched_rectangle.xdmf'
-    ff_xdmf = meshio_get_xdmf_from_msh(ff_msh, path_xdmf=_path, f_xdmf=f_xdmf, geo_dim=2)
+                                            , left_sup=10., right_sup=310., embedded_nodes=embedded_nodes \
+                                            , _path=_path, _name=_name)
+    ff_xdmf = get_xdmf_mesh_by_meshio(ff_msh, geo_dim=2, path_xdmf=_path)
     
     import dolfin as df
     mesh = df.Mesh()

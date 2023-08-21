@@ -12,21 +12,43 @@ f: file (only file name + format)
 ff: full file (path + file name + format)
 """
 
-def meshio_get_xdmf_from_msh(ff_msh, path_xdmf, f_xdmf, geo_dim):
-    make_path(path_xdmf)
-    meshio_mesh_ = meshio.read(ff_msh) # Has allways points in x-y-z coordinates.
-    if meshio_mesh_.points.shape[1]==geo_dim:
-        meshio_mesh = meshio_mesh_
+def get_xdmf_mesh_by_meshio(ff_mesh, geo_dim, path_xdmf=None, _msg=True):
+    """
+    ff_mesh:
+        the 'full' name of the file containing an input mesh (with any format that meshio supports).
+    path_xdmf:
+        the path in which the file of the generated/converted xdmf-mesh is stored. If None, the same path of ff_mesh is used.
+    NOTEs:
+        - The name of the converted file is the same as the input file's.
+        - The 'geo_dim' is required to remove unnecessary nodal coordinates (possibly the 'y' and/or 'z' coordinates).
+    """
+    fn, fe = os.path.splitext(os.path.basename(ff_mesh))
+    if fe == '.xdmf':
+        if _msg:
+            print(f"The given mesh is already in '.xdmf' format.")
+        file_mesh_xdmf = ff_mesh
     else:
-        meshio_mesh = meshio.Mesh(points=meshio_mesh_.points[:, :geo_dim], cells=meshio_mesh_.cells) # Remove unnecessary coordinates.
-    ff_xdmf = path_xdmf + '/' + f_xdmf
-    cell_type = {1: 'line', 2: 'triangle', 3: 'tetra'}[geo_dim]
-    meshio.write_points_cells(ff_xdmf, meshio_mesh.points \
-                              , cells={cell_type: meshio_mesh.get_cells_type(cell_type)})
+        if _msg:
+            print(f"The given mesh is converted to '.xdmf' format.")
+        if path_xdmf is None:
+            path_xdmf = os.path.dirname(ff_mesh) + '/'
+        else:
+            if not os.path.exists(path_xdmf):
+                os.makedirs(path_xdmf)
+        file_mesh_xdmf = path_xdmf + fn + '.xdmf'
+        ## Convert the mesh
+        meshio_mesh_ = meshio.read(ff_mesh) # Has allways points in x-y-z coordinates.
+        if meshio_mesh_.points.shape[1]==geo_dim:
+            meshio_mesh = meshio_mesh_
+        else:
+            meshio_mesh = meshio.Mesh(points=meshio_mesh_.points[:, :geo_dim], cells=meshio_mesh_.cells) # Remove unnecessary coordinates.
+        cell_type = {1: 'line', 2: 'triangle', 3: 'tetra'}[geo_dim]
+        meshio.write_points_cells(file_mesh_xdmf, meshio_mesh.points \
+                                , cells={cell_type: meshio_mesh.get_cells_type(cell_type)})
         # The following two would fail to be read back in FEniCS for case of tetra cell type!
     # meshio.write_points_cells(ff_xdmf, meshio_mesh.points, meshio_mesh_.cells)
     # meshio.write(ff_xdmf, meshio_mesh)
-    return ff_xdmf
+    return file_mesh_xdmf
 
 def geometric_resolution_over_length(l, scale, l0):
     """
