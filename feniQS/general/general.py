@@ -599,7 +599,7 @@ def find_among_points(points, points0, tol):
     return _ids
 
 def contour_plot_2d_irregular(xs, ys, zs, res=0.5, _tits=['Title'], xl='', yl='', levels=15 \
-                                  , _path='./', _name='contourplot', _format='.pdf', dpi=100):
+                                  , _path='./', _name='contourplot', _format='.pdf', dpi=100, _show_plot=True):
     """
     zs: A list of several z (ideally for 1 or 2 or 3 z entries. A more number of entries needs adjustment of subplots).
     x, y, zs: 1-D arrays of the same length representing some arbitrary irregular data points.
@@ -667,7 +667,11 @@ def contour_plot_2d_irregular(xs, ys, zs, res=0.5, _tits=['Title'], xl='', yl=''
     # cbar.set_ticklabels(['low', 'medium', 'high', ...])
     
     plt.savefig(_path + _name + _format, bbox_inches='tight', dpi=dpi)
-    plt.show()
+    if _show_plot:
+        plt.ion()
+        plt.show(block=False)
+    else:
+        plt.ioff()
     
 def plot_interpolated_objective(callable_objective, X0, X1, res=20 \
                                 , xl='Interpolation factor', yl='Objective', tit='Interpolated objective' \
