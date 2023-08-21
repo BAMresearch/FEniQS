@@ -36,6 +36,8 @@ class ParsSlab2D(ParsBase):
             self.loading_T = 1.0
             self.loading_t_end = self.loading_T
 
+            self.bc_y_at_left = 'corner' # or 'edge'
+
             ## REST
             self._write_files = True
             self._plot = True
@@ -124,7 +126,17 @@ class Slab2D(StructureFEniCS):
         
         bc_left_x, bc_left_x_dofs = boundary_condition(i_u.sub(0), df.Constant(0.0), _left)
         bcs_DR.update({'left_x': {'bc': bc_left_x, 'bc_dofs': bc_left_x_dofs}})
-        bc_left_y, bc_left_y_dofs = boundary_condition(i_u.sub(1), df.Constant(0.0), _left)
+
+        if 'corner' in self.pars.bc_y_at_left.lower():
+            # CASE-1: fixed in corner
+            def _left_bot(x, on_boundary):
+                return df.near(x[0], 0., tol) and df.near(x[1], 0., tol)
+            bc_left_y, bc_left_y_dofs = boundary_condition_pointwise(i_u.sub(1), df.Constant(0.0), _left_bot)
+        elif 'edge' in self.pars.bc_y_at_left.lower():
+            # CASE-2: fully clamped
+            bc_left_y, bc_left_y_dofs = boundary_condition(i_u.sub(1), df.Constant(0.0), _left)
+        else:
+            raise ValueError(f"The parameter 'pars.bc_y_at_left={self.pars.bc_y_at_left}' is not recognized. Set it to either 'corner' or 'edge'.")
         bcs_DR.update({'left_y': {'bc': bc_left_y, 'bc_dofs': bc_left_y_dofs}})
         
         if self.u_x is not None:
