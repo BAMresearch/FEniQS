@@ -67,7 +67,7 @@ class PiecewiseLinearOverDatapoints(df.UserExpression):
     """
     def __init__(self, ts, vals, _degree=0, t0=0., _tol=1e-8 \
                  , _plot=True, _res=None, lab_x='t', lab_y='u', sz=14, _tit='Piecewise linear expression', marker='o' , linestyle='--' \
-                    , _save=True, _path='./', _name='Piecewise_linear_expression', _format='.png'):
+                    , _save=True, _path='./', _name='Piecewise_linear_expression', _format='.png', _show_plot=True):
         assert len(ts)==len(vals)
         super().__init__(degree=_degree)
         self.ts = ts
@@ -78,7 +78,7 @@ class PiecewiseLinearOverDatapoints(df.UserExpression):
         if _plot:
             # _res = len(ts) - 1 if _res is None else _res
             plot_expression_of_t(self, t0=self.t0, t_end=self.ts[-1], ts=self.ts, lab_x=lab_x, lab_y=lab_y, sz=sz, _tit=_tit\
-                                 , _save=_save, _path=_path, _name=_name, _format=_format, marker=marker, linestyle=linestyle )
+                                 , _save=_save, _path=_path, _name=_name, _format=_format, marker=marker, linestyle=linestyle, _show_plot=_show_plot)
     def __call__(self, t):
         self.t = t
     def _value_at_t(self, t):
@@ -122,7 +122,7 @@ class SpatialExpressionFromPython(df.UserExpression):
 class TimeVaryingExpressionFromPython(df.UserExpression):
     def __init__(self, t_callable, t0=0., T=1.0, _degree=1, nested_expr=df.Expression('val', val=1.0, t=0.0, degree=0) \
                  , _plot=True, _res=1000, lab_x='t', lab_y='u', sz=14, _tit='Plot over time', marker='', linestyle='-'  \
-                    , _save=True, _path='./', _name='plot', _format='.png'\
+                    , _save=True, _path='./', _name='plot', _format='.png', _show_plot=True \
                      , **kwargs):
         super().__init__(degree=_degree, **kwargs)
         assert callable(t_callable)
@@ -132,8 +132,8 @@ class TimeVaryingExpressionFromPython(df.UserExpression):
         self.t = t0 # time
         self.nested_expr = nested_expr
         if _plot:
-            plot_expression_of_t(self, t0=self.t0, t_end=self.Tend, _res=_res, lab_x=lab_x, lab_y=lab_y, sz=sz, _tit=_tit\
-                                 , _save=_save, _path=_path, _name=_name, _format=_format, marker=marker, linestyle=linestyle)
+            plot_expression_of_t(self, t0=self.t0, t_end=self.Tend, _res=_res, lab_x=lab_x, lab_y=lab_y, sz=sz, _tit=_tit \
+                                 , _save=_save, _path=_path, _name=_name, _format=_format, marker=marker, linestyle=linestyle, _show_plot=_show_plot)
     def eval(self, values, x):
         self.nested_expr.t = self.t
         values[0] = self.t_callable(self.t) * self.nested_expr(x)
@@ -141,7 +141,7 @@ class TimeVaryingExpressionFromPython(df.UserExpression):
         return ()
 
 def plot_expression_of_t(expr, t0, t_end, ts=None, _res=1000, lab_x='t', lab_y='u', sz=14, _tit='Plot'\
-                    , _save=True, _path='./', _name='plot', _format='.png', marker='' , linestyle='-' ):
+                    , _save=True, _path='./', _name='plot', _format='.png', marker='' , linestyle='-', _show_plot=True):
     import matplotlib.pyplot as plt
     try:
         import seaborn as sns
@@ -161,7 +161,11 @@ def plot_expression_of_t(expr, t0, t_end, ts=None, _res=1000, lab_x='t', lab_y='
         if not os.path.exists(_path):
             os.makedirs(_path)
         plt.savefig(_path + _name + _format, bbox_inches='tight', dpi=300)
-    plt.show()
+    if _show_plot:
+        plt.ion()
+        plt.show(block=False)
+    else:
+        plt.ioff()
     
 def evaluate_expression_of_t(expr, t0=0.0, t_end=1.0, ts=None, _res=1000):
     if ts is None:
@@ -179,19 +183,19 @@ def evaluate_expression_of_t(expr, t0=0.0, t_end=1.0, ts=None, _res=1000):
 
 def ramp_expression(f_max, t0=0.0, T=1.0, _degree=1 \
                     , _plot=True, _res=1000, lab_x='t', lab_y='u', sz=14, _tit='Ramp' \
-                    , _save=True, _path='./', _name='ramp', _format='.png'):
+                    , _save=True, _path='./', _name='ramp', _format='.png', _show_plot=True):
     """
         f_max: maximum value of the function
     """
     expr = df.Expression('f_max * t / T', degree=_degree, t=t0, T=T, f_max=f_max)
     if _plot:
         plot_expression_of_t(expr, t0=t0, t_end=T, _res=_res, lab_x=lab_x, lab_y=lab_y, sz=sz, _tit=_tit\
-                                 , _save=_save, _path=_path, _name=_name, _format=_format)
+                                 , _save=_save, _path=_path, _name=_name, _format=_format, _show_plot=_show_plot)
     return expr
 
 def cyclic_expression(f_max, N=1, t0=0.0, T=1.0, _degree=1, _type='sin' \
                     , _plot=True, lab_x='t', lab_y='u', sz=14, _tit='Cyclic' \
-                    , _save=True, _path='./', _name='cyclic', _format='.png'):
+                    , _save=True, _path='./', _name='cyclic', _format='.png', _show_plot=True):
     """
     f_max: maximum value of the function
     N: the number of cycles
@@ -210,13 +214,13 @@ def cyclic_expression(f_max, N=1, t0=0.0, T=1.0, _degree=1, _type='sin' \
         expr = df.Expression('(cos(N * 2 * p * t / T) <= 0.0) ? -r*f_max*(t-T*floor((ceil(r*t))/2)/(2*N)) : r*f_max*(t-T*floor((ceil(r*t))/2)/(2*N))', degree=_degree, t=t0, T=T, f_max=f_max, p=np.pi, N=N, r=4*N/T)            
     if _plot:
         plot_expression_of_t(expr, t0=t0, t_end=T, _res=_res, lab_x=lab_x, lab_y=lab_y, sz=sz, _tit=_tit\
-                                 , _save=_save, _path=_path, _name=_name, _format=_format)
+                                 , _save=_save, _path=_path, _name=_name, _format=_format, _show_plot=_show_plot)
     return expr
 
     
 def scalar_switcher_expression(intervals_bounds, switch_vals, _degree=0, nested_expr=df.Expression('val', val=1.0, t=0.0, degree=0)\
                                , _plot=True, _res=1000, lab_x='t', lab_y='u', sz=14, _tit='Plot' \
-                                   , _save=True, _path='./', _name='plot', _format='.png'):
+                                   , _save=True, _path='./', _name='plot', _format='.png', _show_plot=True):
     assert len(switch_vals) == len(intervals_bounds) - 1
     def switcher(t):
         value="not_yet_evaluated"
@@ -232,5 +236,5 @@ def scalar_switcher_expression(intervals_bounds, switch_vals, _degree=0, nested_
         return value
     expr = TimeVaryingExpressionFromPython(t_callable=switcher, t0=intervals_bounds[0], T=intervals_bounds[-1], _degree=_degree, nested_expr=nested_expr \
                  , _plot=_plot, _res=_res, lab_x=lab_x, lab_y=lab_y, sz=sz, _tit=_tit \
-                    , _save=_save, _path=_path, _name=_name, _format=_format)
+                    , _save=_save, _path=_path, _name=_name, _format=_format, _show_plot=_show_plot)
     return expr
