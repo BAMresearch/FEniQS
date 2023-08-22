@@ -23,12 +23,7 @@ class ParsBccCompressed(ParsBase):
             self.l_cell       = 0.2 # for mesh resolution
             
                 # CASE (2): form a link (e.g. provided elsewhere)
-            # self.link_mesh_xdmf = './DATAs/meshes/bcc/bcc_1/220214_test_A.xdmf'
-            # Remove parameters if link_mesh_xdmf is given
-            
-            if hasattr(self, 'link_mesh_xdmf'):
-                for k in ['shape_name', 'n_rve', 'l_rve', 'r_strut', 'add_plates', 'l_cell']:
-                    delattr(self, k)
+            # self.link_mesh_xdmf = ... any link ...
             
             ## LOADs and BCs
             self.loading_level = -0.3# A total level (magnifier) of loading (at middle)
@@ -42,6 +37,13 @@ class ParsBccCompressed(ParsBase):
             self._write_files = True
         else:
             ParsBase.__init__(self, **kwargs)
+    
+    def __setattr__(self, name, value):
+        super().__setattr__(name, value) # standard self.name=value
+        if name=='link_mesh_xdmf':
+            if (len(self.link_mesh_xdmf) > 0): # non-empty string, pointing to a file.
+                for k in ['n_rve', 'l_rve', 'r_strut', 'add_plates', 'l_cell']: # remove parameters related to the geometry.
+                    delattr(self, k)
 
 class BccCompressed(StructureFEniCS):
     def __init__(self, pars, _path=None, _name=None):
