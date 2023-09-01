@@ -15,20 +15,23 @@ class DoitTaskManager:
         fds = self.get_file_dep()
         acs = self.get_actions()
         ts = self.get_targets()
+        uds = self.get_uptodate()
         if self.has_subTasks:
             ns = self.get_subTasks_names()
-            for n, fd, a, t in zip(ns, fds, acs, ts):
+            for n, fd, a, t, ud in zip(ns, fds, acs, ts, uds):
                 yield {'name': n,
                        'file_dep': fd,
                        'actions': a,
                        'targets': t,
-                       'task_dep': self.tasks_dep
+                       'task_dep': self.tasks_dep,
+                       'uptodate': ud,
                        }
         else:
             return {'file_dep': fds,
                     'actions': acs,
                     'targets': ts,
-                    'task_dep': self.tasks_dep
+                    'task_dep': self.tasks_dep,
+                    'uptodate': uds,
                     }
     def get_subTasks_names(self): # only relevant if has_subTasks==True
         raise NotImplementedError(f"Overwrite the implementation of 'get_subTasks_names'.")
@@ -38,3 +41,6 @@ class DoitTaskManager:
         raise NotImplementedError(f"Overwrite the implementation of 'get_actions'.")
     def get_targets(self, only_files=False):
         raise NotImplementedError(f"Overwrite the implementation of 'get_targets'.")
+    def get_uptodate(self):
+        nst = self.num_sub_tasks
+        return [[True] for i in range(nst)]
