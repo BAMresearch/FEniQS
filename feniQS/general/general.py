@@ -140,17 +140,30 @@ class MemoryTracker:
             s += f"{remark:20}{mem-self.memory[0]:5.3f} GB\n"
         return s
 
-def exp_spatial_correlation(points, cor_length=None, cor_length_scale=0.):
+def exp_spatial_correlation(points, cor_length=None, cor_length_scale=0. \
+                            , cor_length_scale_feature='mean'):
     """
     If the cor_length is NOT given (is None), it is set to:
-        'cor_length_scale * Maximum of dual distances between all points',
-        so, 'cor_length_scale' is between 0 and 1 .
+        'cor_length_scale * (Maximum OR Minimum OR Average) of dual distances between all points',
+        which is decided by the input 'cor_length_scale_feature' beaing either of 'max', 'min', 'mean'.
+        The 'cor_length_scale' is larger than 0 and usually less than 1.
     """
     import scipy.spatial as scispa
     distances = scispa.distance.cdist(points, points, metric='euclidean')
+    assert all([(a==0.) for a in np.diag(distances)])
     if cor_length is None:
-        assert (0. < cor_length_scale <= 1.0)
-        cor_length = np.max(distances) * cor_length_scale
+        assert (0. < cor_length_scale)
+        off_diagonal_vector = distances[~np.eye(distances.shape[0], dtype=bool)]
+        assert all([a not in off_diagonal_vector for a in np.diag(distances)])
+        if cor_length_scale_feature=='mean':
+            f = np.mean
+        elif cor_length_scale_feature=='min':
+            f = np.min
+        elif cor_length_scale_feature=='max':
+            f = np.max
+        else:
+            raise ValueError(f"The given input 'cor_length_scale_feature'='{cor_length_scale_feature}' is not implemented.")
+        cor_length = f(off_diagonal_vector) * cor_length_scale
     return cor_length, np.exp(- distances / cor_length)
 
 def compute_jacobian_cd(f, X, X_ids=None, _eps=1e-5, zero_thr=1e-10):
