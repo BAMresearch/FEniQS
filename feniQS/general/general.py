@@ -679,7 +679,13 @@ def contour_plot_2d_irregular(xs, ys, zs, res=0.5, _tits=['Title'], xl='', yl=''
     # cbar.set_ticks(np.arange(...))
     # cbar.set_ticklabels(['low', 'medium', 'high', ...])
     
-    plt.savefig(_path + _name + _format, bbox_inches='tight', dpi=dpi)
+    if isinstance(_path, str):
+        _path = [_path]
+    else:
+        assert isinstance(_path, list) or isinstance(_path, tuple)
+        assert all([isinstance(_p, str) for _p in _path])
+    for _p in _path:
+        plt.savefig(_p + _name + _format, bbox_inches='tight', dpi=dpi)
     if _show_plot:
         plt.ion()
         plt.show(block=False)
