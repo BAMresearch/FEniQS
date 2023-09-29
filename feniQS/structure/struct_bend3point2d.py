@@ -171,9 +171,9 @@ class Bend3Point2D(StructureFEniCS):
         tol = self.mesh.rmin() / 1000
         for rp in reaction_places:
             if 'left' in rp.lower():
-                ps = [[self.pars.left_sup, 0.]] # left
+                ps = [list(p) for p in self.get_support_nodes('left')] # left
             elif 'right' in rp.lower():
-                ps = [[self.pars.right_sup, 0.]] # right
+                ps = [list(p) for p in self.get_support_nodes('right')] # right
             elif 'middle' in rp.lower():
                 ps = []
                 for pp in self.mesh.coordinates():
