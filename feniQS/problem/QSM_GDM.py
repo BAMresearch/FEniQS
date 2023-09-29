@@ -140,7 +140,10 @@ class QSModelGDM(QuasiStaticModel):
         Ps_all = model_solved.struct.mesh.coordinates()
         dofs_Dirichlet = fen.bcs_DR_dofs + fen.bcs_DR_inhom_dofs
         Ps_Dirichlet = i_full.tabulate_dof_coordinates()[dofs_Dirichlet,:]
-        ids_ = find_among_points(Ps_Dirichlet, Ps_all, fen.mesh.hmin()/1000.)
+        dofs_penalty = model_solved.fen.penalty_dofs
+        Ps_penalty = i_full.tabulate_dof_coordinates()[dofs_penalty,:]
+        Ps_fix, _ = add_unique_points(Ps_penalty, Ps_Dirichlet) # Both penalty and Dirichlet DOFs must not get imposed displacements.
+        ids_ = find_among_points(Ps_fix, Ps_all, fen.mesh.hmin()/1000.)
         Ps_free = np.array([P for i,P in enumerate(Ps_all) if i not in ids_])
         _path_extended = model_solved._path + path_extension
         make_path(_path_extended)
@@ -155,11 +158,19 @@ class QSModelGDM(QuasiStaticModel):
                 if geo_dim==1:
                     dx = max(np.max(Ps_Dirichlet), np.max(Ps_free)) - min(np.min(Ps_Dirichlet), np.min(Ps_free))
                     _y = dx / 20.
-                    plt.plot(Ps_Dirichlet[:], len(Ps_Dirichlet) * [_y], label='Dirichlet DOFs', linestyle='', marker='P', fillstyle='none')
-                    plt.plot(Ps_free[:], len(Ps_free) * [_y], label='Free DOFs', linestyle='', marker='.')
+                    if len(Ps_Dirichlet)>0:
+                        plt.plot(Ps_Dirichlet[:], len(Ps_Dirichlet) * [_y], label='Dirichlet DOFs', linestyle='', marker='P', fillstyle='none')
+                    if len(Ps_free)>0:
+                        plt.plot(Ps_free[:], len(Ps_free) * [_y], label='Free DOFs', linestyle='', marker='.')
+                    if len(Ps_penalty)>0:
+                        plt.plot(Ps_penalty[:], len(Ps_penalty) * [_y], label='Penalty DOFs (with spring)', linestyle='', marker="1")
                 elif geo_dim==2:
-                    plt.plot(Ps_Dirichlet[:,0], Ps_Dirichlet[:,1], label='Dirichlet DOFs', linestyle='', marker='P', fillstyle='none')
-                    plt.plot(Ps_free[:,0], Ps_free[:,1], label='Free DOFs', linestyle='', marker='.')
+                    if len(Ps_Dirichlet)>0:
+                        plt.plot(Ps_Dirichlet[:,0], Ps_Dirichlet[:,1], label='Dirichlet DOFs', linestyle='', marker='P', fillstyle='none')
+                    if len(Ps_free)>0:
+                        plt.plot(Ps_free[:,0], Ps_free[:,1], label='Free DOFs', linestyle='', marker='.')
+                    if len(Ps_penalty)>0:
+                        plt.plot(Ps_penalty[:,0], Ps_penalty[:,1], label='Penalty DOFs (with spring)', linestyle='', marker="1")
                 plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
                 plt.savefig(f"{_path_extended}free_and_Dirichlet_DOFs.png", bbox_inches='tight', dpi=400)
                 plt.show()
