@@ -102,6 +102,7 @@ class QSModelGDM(QuasiStaticModel):
     def _commit_struct_to_model(self):
         """
         To commit BCs and time-varying loadings from structure to the model.
+        Also, to handle penalizing DOFs; i.e. putting linear springs at certain DOFs.
         """
         bcs_hom, bcs_inhom, time_varying_loadings = self.struct.get_BCs(self.fen.get_iu())
         self.time_varying_loadings.update(time_varying_loadings)
@@ -109,6 +110,22 @@ class QSModelGDM(QuasiStaticModel):
         bcs_inhom = [bc['bc'] for bc in bcs_inhom.values()]
         self.revise_BCs(remove=True, new_BCs=bcs_hom, _as='hom')
         self.revise_BCs(remove=False, new_BCs=bcs_inhom, _as='inhom')
+        
+        penalty_features = self.struct.get_penalty_features(self.fen.get_iu())
+        if len(penalty_features)>0:
+            pws = [] # penalty weights
+            pdofss = []
+            for penalty in penalty_features.values():
+                pw = penalty['weight']
+                if penalty['u0']!=0. or not any([isinstance(pw, a) for a in [int, float, np.float64]]):
+                    raise NotImplementedError(f"Penalty feature is not implemented for nonzero reference disp. and for non-uniform penalty weight.")
+                pw0 = pw if len(pws)==0 else pws[-1]
+                if pw!=pw0:
+                    raise NotImplementedError(f"Penalty feature is not implemented for multiple different penalty weights.")
+                pws.append(pw)
+                pdofss += penalty['dofs']
+            self.penalty_dofs = pdofss
+            self.penalty_weight.assign(pw) # the same
     
     def get_reaction_dofs(self, reaction_places):
         return self.struct.get_reaction_dofs(reaction_places, i_u=self.fen.get_iu())

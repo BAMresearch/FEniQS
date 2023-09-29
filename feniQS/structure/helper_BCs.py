@@ -23,7 +23,8 @@ def bc_on_middle_3point_bending(x_from, x_to, ly, i_u, u_expr, tol):
     return bc_middle_top, bc_middle_top_dofs, middle_top
 
 def load_and_bcs_on_3point_bending(mesh, lx, ly, x_from, x_to, i_u, u_expr \
-                                   , left_sup=0., right_sup=None, left_sup_w=0., right_sup_w=0., x_fix='left'):
+                                   , left_sup=0., right_sup=None, left_sup_w=0., right_sup_w=0. \
+                                   , x_fix='left', supports_Ky=None):
     """
     mesh: a rectangle mesh of lx*ly
     i_u: function_space of the full displacement field
@@ -32,6 +33,8 @@ def load_and_bcs_on_3point_bending(mesh, lx, ly, x_from, x_to, i_u, u_expr \
     For a 3point-bending structure ready for a modelling (e.g. to be given a material type in the future)
     , returns:
         bcs_DR, bcs_DR_inhom
+    If 'supports_Ky' is NOT 'None', the vertical BCs at the supports are ignored, since they are supposed
+        to be handled via spring coefficients.
     """
     assert(mesh.geometric_dimension()==2)
     assert(i_u.num_sub_spaces()==2)
@@ -65,10 +68,11 @@ def load_and_bcs_on_3point_bending(mesh, lx, ly, x_from, x_to, i_u, u_expr \
         if len(bc_left_x_dofs) == 0:
             raise ValueError('No DOFs were found for the left-side support. You might need to redefine the mesh.')
         bcs_DR.update({'left_x': {'bc': bc_left_x, 'bc_dofs': bc_left_x_dofs}})
-    bc_left_y, bc_left_y_dofs = mm(i_u.sub(1), df.Constant(0.0), left_bot)
-    if len(bc_left_y_dofs) == 0:
-        raise ValueError('No DOFs were found for the left-side support. You might need to redefine the mesh.')
-    bcs_DR.update({'left_y': {'bc': bc_left_y, 'bc_dofs': bc_left_y_dofs}})
+    if supports_Ky is None:
+        bc_left_y, bc_left_y_dofs = mm(i_u.sub(1), df.Constant(0.0), left_bot)
+        if len(bc_left_y_dofs) == 0:
+            raise ValueError('No DOFs were found for the left-side support. You might need to redefine the mesh.')
+        bcs_DR.update({'left_y': {'bc': bc_left_y, 'bc_dofs': bc_left_y_dofs}})
     
     ## on the middle
     if u_expr is not None:
@@ -98,10 +102,11 @@ def load_and_bcs_on_3point_bending(mesh, lx, ly, x_from, x_to, i_u, u_expr \
         if len(bc_right_x_dofs) == 0:
             raise ValueError('No DOFs were found for the right-side support. You might need to redefine the mesh.')
         bcs_DR.update({'right_x': {'bc': bc_right_x, 'bc_dofs': bc_right_x_dofs}})
-    bc_right_y, bc_right_y_dofs = mm(i_u.sub(1), df.Constant(0.0), right_bot)
-    if len(bc_right_y_dofs) == 0:
-        raise ValueError('No DOFs were found for the right-side support. You might need to redefine the mesh.')
-    bcs_DR.update({'right_y': {'bc': bc_right_y, 'bc_dofs': bc_right_y_dofs}})
+    if supports_Ky is None:
+        bc_right_y, bc_right_y_dofs = mm(i_u.sub(1), df.Constant(0.0), right_bot)
+        if len(bc_right_y_dofs) == 0:
+            raise ValueError('No DOFs were found for the right-side support. You might need to redefine the mesh.')
+        bcs_DR.update({'right_y': {'bc': bc_right_y, 'bc_dofs': bc_right_y_dofs}})
     
     ## optional (corresponding dolfin measure)
     # mf = df.MeshFunction('size_t', mesh, 1) # dim=1 implies on edges/lines --- as of the geometry of the boundary domain

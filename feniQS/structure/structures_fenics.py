@@ -62,22 +62,31 @@ class StructureFEniCS():
             A list of lists each being DOFs related to given reaction places.
         """
         bcs_DR, bcs_DR_inhom, _ = self.get_BCs(i_u)
+        penalty_features = self.get_penalty_features(i_u)
         dofs = []
         for rp in reaction_places:
             rp_ = rp.split('_')
-            bc = None
+            dofs_rp = None
             for k in bcs_DR.keys():
                 if all([r in k for r in rp_]):
-                    bc = bcs_DR[k]
+                    dofs_rp = bcs_DR[k]['bc_dofs']
                     break
-            if bc is None:
+            if dofs_rp is None:
                 for k in bcs_DR_inhom.keys():
                     if all([r in k for r in rp_]):
-                        bc = bcs_DR_inhom[k]
+                        dofs_rp = bcs_DR_inhom[k]['bc_dofs']
                         break
-            if bc is None:
-                raise KeyError(f"Reaction place '{rp}' is not recognized among Dirichlet boundary conditions created via 'self.get_BCs(i_u)' method.")
-            dofs.append(bc['bc_dofs'])
+            if dofs_rp is None:
+                for k in penalty_features.keys():
+                    if all([r in k for r in rp_]):
+                        dofs_rp = penalty_features[k]['dofs']
+                        break
+            if dofs_rp is None:
+                _msg = f"Reaction place '{rp}' is recognized neither among Dirichlet boundary conditions "
+                _msg += f"(created via 'self.get_BCs(i_u)' method)"
+                _msg += f", nor among penalty features specifying nodal springs."
+                raise KeyError(_msg)
+            dofs.append(dofs_rp)
         
         return dofs # A list of lists each being DOFs related to a reaction place    
     
@@ -119,6 +128,19 @@ class StructureFEniCS():
         f = {'location': location, 'value': value, 'scale': scale}
         self.concentrated_forces[direction].append(f)
     
+    def get_penalty_features(self, i_u):
+        """
+        This concerns the degrees of freedom at which a spring with stiffness of 'penalty weight'
+        should be modelled.
+        i_u: The function space corresponding to the displacements.
+        Returns a dictionary whose each key goes for example to a certain spring, and each value
+        by itself is a dictionary with the following items:
+            'weight': The spring coefficient. So far, a constant uniform value is implemented.
+            'dofs': The degrees of freedom at which a spring is put.
+            'u0': The reference value of displacement w.r.t. which the spring acts.
+        """
+        return {}
+
     def refine_mesh(self, refinement_level):
         if not (isinstance(refinement_level, int) and refinement_level>=0):
             raise ValueError(f"The 'refinement_level' must be a non-negative integer.")

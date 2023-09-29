@@ -14,7 +14,7 @@ pth_struct_bend3point2d.add_script(pth_helper_loadings)
 class ParsBend3Point2D(ParsBase):
     def __init__(self, **kwargs):
         """
-        It must have the following parameters:
+        It must have the following parameters (except otherwise is noted):
             ## GEOMETRY
             self.lx
             self.ly
@@ -47,6 +47,7 @@ class ParsBend3Point2D(ParsBase):
             
             ## LOADs and BCs
             self.fix_x_at # 'left' or 'right'
+            self.supports_Ky # (optional) if any exists, the stiffness of the springs that model the supports
             self.loading_control # Either 'u': displacement-controlled or 'f': force-controlled
             self.loading_level # A total level (magnifier) of loading (at middle), which can be either displacement or force (depending on self.loading_control)
             self.loading_scales # Several possible peaks for loading (at middle) --> peaks = level * scales
@@ -158,10 +159,12 @@ class Bend3Point2D(StructureFEniCS):
         time_varying_loadings = {}
         if self.u_y_middle is not None:
             time_varying_loadings.update({'y_middle': self.u_y_middle})
+        supports_Ky = None if (not hasattr(self.pars, 'supports_Ky')) else self.pars.supports_Ky
         bcs_DR, bcs_DR_inhom = load_and_bcs_on_3point_bending(self.mesh, self.pars.lx, self.pars.ly, self.pars.x_from, self.pars.x_to \
                                           , i_u=i_u, u_expr=self.u_y_middle \
                                               , left_sup=self.pars.left_sup, right_sup=self.pars.right_sup \
-                                                  , left_sup_w=self.pars.left_sup_w, right_sup_w=self.pars.right_sup_w, x_fix=self.pars.fix_x_at)
+                                                  , left_sup_w=self.pars.left_sup_w, right_sup_w=self.pars.right_sup_w \
+                                                    , x_fix=self.pars.fix_x_at, supports_Ky=supports_Ky)
         if self.f_y_middle is not None:
             time_varying_loadings.update({'y_middle': self.f_y_middle})
         return bcs_DR, bcs_DR_inhom, time_varying_loadings
@@ -223,6 +226,43 @@ class Bend3Point2D(StructureFEniCS):
             nodes = self.get_reaction_nodes(['middle'])[0]
             dofs = dofs_at(points=nodes, V=i_full, i=i_u.sub(1)) # in y-direction
         return dofs
+    
+    def get_penalty_features(self, i_u):
+        if hasattr(self.pars, 'supports_Ky'):
+            pfs = {}
+            tol = self.mesh.rmin() / 1000.
+            
+            # y_left
+            ll = self.pars.left_sup - self.pars.left_sup_w / 2.
+            if self.pars.left_sup_w==0.:
+                mm = boundary_condition_pointwise
+                def left_bot(x, on_boundary):
+                    return df.near(x[0], ll, tol) and df.near(x[1], 0., tol)
+            else:
+                mm = boundary_condition
+                def left_bot(x, on_boundary):
+                    return on_boundary and df.between(x[0], (ll - tol, ll + self.pars.left_sup_w + tol)) \
+                          and df.near(x[1], 0., tol)
+            _, bc_left_y_dofs = mm(i_u.sub(1), df.Constant(0.0), left_bot)
+            pfs['y_left'] = {'weight': self.pars.supports_Ky, 'dofs': bc_left_y_dofs, 'u0': 0.}
+
+            # y_right
+            rr = self.pars.right_sup + self.pars.right_sup_w / 2.
+            if self.pars.right_sup_w==0.:
+                mm = boundary_condition_pointwise
+                def right_bot(x, on_boundary):
+                    return df.near(x[0], rr, tol) and df.near(x[1], 0., tol)
+            else:
+                mm = boundary_condition
+                def right_bot(x, on_boundary):
+                    return on_boundary and df.between(x[0], (rr - self.pars.right_sup_w - tol, rr + tol)) \
+                        and df.near(x[1], 0., tol)
+            _, bc_right_y_dofs = mm(i_u.sub(1), df.Constant(0.0), right_bot)
+            pfs['y_right'] = {'weight': self.pars.supports_Ky, 'dofs': bc_right_y_dofs, 'u0': 0.}
+            
+            return pfs
+        else:
+            return StructureFEniCS.get_penalty_features(self, i_u)
     
     def switch_loading_control(self, loading_control, load=None):
         """
