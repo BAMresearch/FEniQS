@@ -57,6 +57,8 @@ class Bend3Point2D_cutMiddle(Bend3Point2D):
                 self.u_y_middle = self.parent_struct.u_y_middle
             elif self.parent_struct.f_y_middle is not None:
                 self.f_y_middle = self.parent_struct.f_y_middle
+            else:
+                raise ValueError(f"No loading is recognized from the parent structure.")
         
         if self.pars._plot:
             plt.figure()
@@ -66,23 +68,20 @@ class Bend3Point2D_cutMiddle(Bend3Point2D):
             plt.show()
         if self.pars._write_files:
             write_to_xdmf(self.mesh, xdmf_name=self._name+'_mesh.xdmf', xdmf_path=self._path)
-    
-    def get_BCs(self, i_u):
-        bcs_DR = {}
+
+    def build_BCs(self, i_u):
+        self.bcs_DR = {}
         if self.load_at_middle:
             if self.u_y_middle is not None:
-                time_varying_loadings = {'y_middle': self.u_y_middle}
                 bcs_DR_inhom, bcs_DR_inhom_dofs, _ = bc_on_middle_3point_bending(x_from=self.pars.x_from, x_to=self.pars.x_to, ly=self.pars.ly \
                                                                             , i_u=i_u, u_expr=self.u_y_middle, tol=self.mesh.rmin()/1000.)
-                bcs_DR_inhom = {'y_middle': {'bc': bcs_DR_inhom, 'bc_dofs': bcs_DR_inhom_dofs}}
+                self.bcs_DR_inhom = {'y_middle': {'bc': bcs_DR_inhom, 'bc_dofs': bcs_DR_inhom_dofs}}
             elif self.f_y_middle is not None:
-                time_varying_loadings = {'y_middle': self.f_y_middle}
-                bcs_DR_inhom = {}
+                self.bcs_DR_inhom = {}
             else:
                 raise ValueError(f"No loading is recognized from the parent structure.")
         else:
-            bcs_DR_inhom, time_varying_loadings = {}, {}
-        return bcs_DR, bcs_DR_inhom, time_varying_loadings
+            self.bcs_DR_inhom = {}
     
     def get_reaction_nodes(self, reaction_places): # overwritten
         nodes = []

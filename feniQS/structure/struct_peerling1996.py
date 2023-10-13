@@ -74,24 +74,27 @@ class Peerling1996(StructureFEniCS):
         else:
             raise ValueError(f"Loading control of the structure is not recognized.")
     
-    def get_BCs(self, i_u):
+    def get_time_varying_loadings(self):
+        time_varying_loadings = {}
+        if self.u_right is not None:
+            time_varying_loadings['right'] = self.u_right
+        elif self.f_right is not None:
+            time_varying_loadings['right'] = self.f_right
+        return time_varying_loadings
+
+    def build_BCs(self, i_u):
         tol = self.mesh.rmin() / 1000
         def left(x):
             return df.near(x[0], 0., tol)
         bcl, bcl_dofs = boundary_condition(i_u, df.Constant(0.0), left)
-        bcs_DR = {'left': {'bc': bcl, 'bc_dofs': bcl_dofs}}
+        self.bcs_DR = {'left': {'bc': bcl, 'bc_dofs': bcl_dofs}}
         if self.u_right is not None:
-            ll = self.u_right
             def right(x):
                 return df.near(x[0], self.pars.L, tol)
             bcr, bcr_dofs = boundary_condition(i_u, self.u_right, right)
-            bcs_DR_inhom = {'right': {'bc': bcr, 'bc_dofs': bcr_dofs}}
+            self.bcs_DR_inhom = {'right': {'bc': bcr, 'bc_dofs': bcr_dofs}}
         elif self.f_right is not None:
-            ll = self.f_right
-            bcs_DR_inhom = {}
-        time_varying_loadings = {'right': ll}
-        
-        return bcs_DR, bcs_DR_inhom, time_varying_loadings
+            self.bcs_DR_inhom = {}
     
     def get_reaction_nodes(self, reaction_places):
         nodes = []

@@ -23,6 +23,10 @@ class StructureFEniCS():
         
         self._build_structure()
         self.build_special_fenics_fields()
+
+        self.bcs_built = False # Structure has no BC objects before any FEM problem (e.g. elasticity, plasticity, ect.) is defined.
+        self.bcs_DR = {}
+        self.bcs_DR_inhom = {}
     
         self.concentrated_forces = {'x': [], 'y': [], 'z': []} # The way it will be formulated in FenicsProblem requires them to be separated in three groups (per direction).
     
@@ -34,25 +38,49 @@ class StructureFEniCS():
         ### LOADs ###
         print("WARNING: The base implementation of the method '_build_structure' is not overwritten.")
     
-    def get_BCs(self, i_u):
+    def get_BCs(self, i_u, fresh=True):
         """
         i_u: A FEniCS function space (or sub-space) corresponding to desired BCs.
             The user must take care of passing a proper i_u according to the implementation of
                 any certain structure in view of a specific problem such as structural mechanics.
             For example for a structural mechanics problem, i_u is the function-space of displacement field.
         Returns:
-            bcs_hom: dictionary containing homogeneous BCs, with:
+            self.bcs_hom: dictionary containing homogeneous BCs, with:
                 key: corresponding place and direction; e.g. top_middle_y, bot_left_xy, edge1_xyz, etc.
                 value: a second dictionary with items regarding these keys:
                     'bc': FEniCS BC object
                     'bc_dofs': corresponding DOFs
-            bcs_inhom: just the same as bcs_hom only regarding inhomogeneius BCs
-            time_varying_loadings: dictionary of FEniCS expressions each having attribute/variable 't' that can be updated.
-                The keys of this dictionary specifies corresponding directions and places for each loading, e.g. x_left, y_middle.
+            self.bcs_inhom: just the same as bcs_hom only regarding inhomogeneius BCs
+        'fresh':
+            True: A fresh set of BCs are built and returned.
+            False:
+                - If the structure already has some BCs, they will be returned.
+                - If the structure does not yet have BCs, a fresh set is built and returned.
         """
-        print("WARNING: The base implementation of the method 'get_BCs' is not overwritten.")
-        bcs_hom, bcs_inhom, time_varying_loadings = {}, {}, {}
-        return bcs_hom, bcs_inhom, time_varying_loadings
+        if fresh or (not self.bcs_built):
+            self.build_BCs(i_u=i_u)
+            self.bcs_built = True
+        return self.bcs_DR, self.bcs_DR_inhom
+    
+    def get_time_varying_loadings(self):
+        print("WARNING: The base implementation of the method 'get_time_varying_loadings' is not overwritten.")
+        return {}
+
+    def build_BCs(self, i_u):
+        """
+        i_u: A FEniCS function space (or sub-space) corresponding to desired BCs.
+            The user must take care of passing a proper i_u according to the implementation of
+                any certain structure in view of a specific problem such as structural mechanics.
+            For example for a structural mechanics problem, i_u is the function-space of displacement field.
+        Builds fresh BC objects:
+            self.bcs_hom: dictionary containing homogeneous BCs, with:
+                key: corresponding place and direction; e.g. top_middle_y, bot_left_xy, edge1_xyz, etc.
+                value: a second dictionary with items regarding these keys:
+                    'bc': FEniCS BC object
+                    'bc_dofs': corresponding DOFs
+            self.bcs_inhom: just the same as bcs_hom only regarding inhomogeneius BCs
+        """
+        print("WARNING: The base implementation of the method 'build_BCs' is not overwritten.")
     
     def get_reaction_dofs(self, reaction_places, i_u):
         """
@@ -61,7 +89,7 @@ class StructureFEniCS():
         Returns:
             A list of lists each being DOFs related to given reaction places.
         """
-        bcs_DR, bcs_DR_inhom, _ = self.get_BCs(i_u)
+        bcs_DR, bcs_DR_inhom = self.get_BCs(i_u, fresh=False)
         penalty_features = self.get_penalty_features(i_u)
         dofs = []
         for rp in reaction_places:
@@ -83,7 +111,7 @@ class StructureFEniCS():
                         break
             if dofs_rp is None:
                 _msg = f"Reaction place '{rp}' is recognized neither among Dirichlet boundary conditions "
-                _msg += f"(created via 'self.get_BCs(i_u)' method)"
+                _msg += f"(obtained from 'self.get_BCs(i_u)' method)"
                 _msg += f", nor among penalty features specifying nodal springs."
                 raise KeyError(_msg)
             dofs.append(dofs_rp)

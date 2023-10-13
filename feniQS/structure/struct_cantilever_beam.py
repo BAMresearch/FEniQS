@@ -75,25 +75,27 @@ class CantileverBeam2D(StructureFEniCS):
         else:
             raise ValueError(f"Loading control of the structure is not recognized.")
     
-    def get_BCs(self, i_u):
-        assert i_u.num_sub_spaces() == 2
+    def get_time_varying_loadings(self):
         time_varying_loadings = {}
         if self.u_y_tip is not None:
-            time_varying_loadings.update({'y_tip': self.u_y_tip})
-        if self.f_y_tip is not None:
-            time_varying_loadings.update({'y_tip': self.f_y_tip})
+            time_varying_loadings['y_tip'] = self.u_y_tip
+        elif self.f_y_tip is not None:
+            time_varying_loadings['y_tip'] = self.f_y_tip
+        return time_varying_loadings
+
+    def build_BCs(self, i_u):
+        assert i_u.num_sub_spaces() == 2
         tol = self.mesh.rmin() / 1000.
-        
-        bcs_DR, bcs_DR_inhom = {}, {}
+        self.bcs_DR, self.bcs_DR_inhom = {}, {}
 
         def left_edge(x, on_boundary):
             return on_boundary and df.near(x[0], 0., tol)
         bc_left_x, bc_left_x_dofs = boundary_condition(i_u.sub(0), df.Constant(0.0), left_edge) # fix in x-direction
-        bcs_DR.update({'left_x': {'bc': bc_left_x, 'bc_dofs': bc_left_x_dofs}})
+        self.bcs_DR.update({'left_x': {'bc': bc_left_x, 'bc_dofs': bc_left_x_dofs}})
         
             ## (1) fully clamped
         bc_left_y, bc_left_y_dofs = boundary_condition(i_u.sub(1), df.Constant(0.0), left_edge) # fix in y-direction
-        bcs_DR.update({'left_y': {'bc': bc_left_y, 'bc_dofs': bc_left_y_dofs}})
+        self.bcs_DR.update({'left_y': {'bc': bc_left_y, 'bc_dofs': bc_left_y_dofs}})
             ## (2) free in y-direction except one node
         # def left_bot(x, on_boundary):
         #     return df.near(x[0], 0., tol) and df.near(x[1], 0., tol)
@@ -105,9 +107,7 @@ class CantileverBeam2D(StructureFEniCS):
             def right_top(x, on_boundary):
                 return df.near(x[0], self.pars.lx, tol) and df.near(x[1], self.pars.ly, tol)
             bc_right, bc_right_dofs = boundary_condition_pointwise(i_u.sub(1), self.u_y_tip, right_top)
-            bcs_DR_inhom.update({'right_tip_y': {'bc': bc_right, 'bc_dofs': bc_right_dofs}})
-        
-        return bcs_DR, bcs_DR_inhom, time_varying_loadings
+            self.bcs_DR_inhom.update({'right_tip_y': {'bc': bc_right, 'bc_dofs': bc_right_dofs}})
     
     def get_reaction_nodes(self, reaction_places):
         nodes = []

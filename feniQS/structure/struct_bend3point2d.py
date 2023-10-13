@@ -155,19 +155,21 @@ class Bend3Point2D(StructureFEniCS):
             else:
                 raise ValueError(f"Loading control of the structure is not recognized.")
     
-    def get_BCs(self, i_u):
+    def get_time_varying_loadings(self):
         time_varying_loadings = {}
         if self.u_y_middle is not None:
-            time_varying_loadings.update({'y_middle': self.u_y_middle})
+            time_varying_loadings['y_middle'] = self.u_y_middle
+        elif self.f_y_middle is not None:
+            time_varying_loadings['y_middle'] = self.f_y_middle
+        return time_varying_loadings
+
+    def build_BCs(self, i_u):
         supports_Ky = None if (not hasattr(self.pars, 'supports_Ky')) else self.pars.supports_Ky
-        bcs_DR, bcs_DR_inhom = load_and_bcs_on_3point_bending(self.mesh, self.pars.lx, self.pars.ly, self.pars.x_from, self.pars.x_to \
+        self.bcs_DR, self.bcs_DR_inhom = load_and_bcs_on_3point_bending(self.mesh, self.pars.lx, self.pars.ly, self.pars.x_from, self.pars.x_to \
                                           , i_u=i_u, u_expr=self.u_y_middle \
                                               , left_sup=self.pars.left_sup, right_sup=self.pars.right_sup \
                                                   , left_sup_w=self.pars.left_sup_w, right_sup_w=self.pars.right_sup_w \
                                                     , x_fix=self.pars.fix_x_at, supports_Ky=supports_Ky)
-        if self.f_y_middle is not None:
-            time_varying_loadings.update({'y_middle': self.f_y_middle})
-        return bcs_DR, bcs_DR_inhom, time_varying_loadings
     
     def get_reaction_nodes(self, reaction_places):
         nodes = []

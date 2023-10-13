@@ -69,28 +69,30 @@ class Rectangle2D(StructureFEniCS):
             else:
                 raise ValueError(f"Loading control of the structure is not recognized.")
     
-    def get_BCs(self, i_u):
-        assert i_u.num_sub_spaces() == 2
+    def get_time_varying_loadings(self):
         time_varying_loadings = {}
         if self.u_y_top is not None:
-            time_varying_loadings.update({'y_top': self.u_y_top})
-        if self.f_y_top is not None:
-            time_varying_loadings.update({'y_top': self.f_y_top})
-        
+            time_varying_loadings['y_top'] = self.u_y_top
+        elif self.f_y_top is not None:
+            time_varying_loadings['y_top'] = self.f_y_top
+        return time_varying_loadings
+
+    def build_BCs(self, i_u):
+        assert i_u.num_sub_spaces() == 2
         tol = self.mesh.rmin() / 1000.
         def bot_left(x, on_boundary):
             return df.near(x[0], 0., tol) and df.near(x[1], 0., tol)
         def bot_right(x, on_boundary):
             return df.near(x[0], self.pars.lx, tol) and df.near(x[1], 0., tol)
         
-        bcs_DR, bcs_DR_inhom = {}, {}
+        self.bcs_DR, self.bcs_DR_inhom = {}, {}
         
         bc_bl_x, bc_bl_x_dofs = boundary_condition_pointwise(i_u.sub(0), df.Constant(0.0), bot_left)
         bc_bl_y, bc_bl_y_dofs = boundary_condition_pointwise(i_u.sub(1), df.Constant(0.0), bot_left)
         bc_br_y, bc_br_y_dofs = boundary_condition_pointwise(i_u.sub(1), df.Constant(0.0), bot_right)
-        bcs_DR.update({'bot_left_x': {'bc': bc_bl_x, 'bc_dofs': bc_bl_x_dofs}})
-        bcs_DR.update({'bot_left_y': {'bc': bc_bl_y, 'bc_dofs': bc_bl_y_dofs}})
-        bcs_DR.update({'bot_right_y': {'bc': bc_br_y, 'bc_dofs': bc_br_y_dofs}})
+        self.bcs_DR.update({'bot_left_x': {'bc': bc_bl_x, 'bc_dofs': bc_bl_x_dofs}})
+        self.bcs_DR.update({'bot_left_y': {'bc': bc_bl_y, 'bc_dofs': bc_bl_y_dofs}})
+        self.bcs_DR.update({'bot_right_y': {'bc': bc_br_y, 'bc_dofs': bc_br_y_dofs}})
         
         if self.u_y_top is not None:
             def top_left(x, on_boundary):
@@ -99,10 +101,8 @@ class Rectangle2D(StructureFEniCS):
                 return df.near(x[0], self.pars.lx, tol) and df.near(x[1], self.pars.ly, tol)
             bc_tl_y, bc_tl_y_dofs = boundary_condition_pointwise(i_u.sub(1), self.u_y_top, top_left)
             bc_tr_y, bc_tr_y_dofs = boundary_condition_pointwise(i_u.sub(1), self.u_y_top, top_right)
-            bcs_DR_inhom.update({'top_left_y': {'bc': bc_tl_y, 'bc_dofs': bc_tl_y_dofs}})
-            bcs_DR_inhom.update({'top_right_y': {'bc': bc_tr_y, 'bc_dofs': bc_tr_y_dofs}})
-        
-        return bcs_DR, bcs_DR_inhom, time_varying_loadings
+            self.bcs_DR_inhom.update({'top_left_y': {'bc': bc_tl_y, 'bc_dofs': bc_tl_y_dofs}})
+            self.bcs_DR_inhom.update({'top_right_y': {'bc': bc_tr_y, 'bc_dofs': bc_tr_y_dofs}})
     
     def get_reaction_nodes(self, reaction_places):
         nodes = []

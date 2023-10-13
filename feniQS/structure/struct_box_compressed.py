@@ -50,14 +50,19 @@ class BoxCompressed(StructureFEniCS):
             write_to_xdmf(self.mesh, xdmf_name=self._name+'_mesh.xdmf', xdmf_path=self._path)
         
         ### LOADs ###
+        self.u_z_top = None
         if _build_middle_load:
             self.u_z_top = time_varying_loading(fs=self.pars.loading_level*np.array(self.pars.loading_scales) \
                                                   , N=self.pars.loading_N, T=self.pars.loading_T, _case=self.pars.loading_case \
                                                   , _path=self._path)
     
-    def get_BCs(self, i_u):
-        time_varying_loadings = {'z_top': self.u_z_top}
-        
+    def get_time_varying_loadings(self):
+        time_varying_loadings = {}
+        if self.u_z_top is not None:
+            time_varying_loadings['z_top'] = self.u_z_top
+        return time_varying_loadings
+
+    def build_BCs(self, i_u):
         cs = self.mesh.coordinates()
         x_min, y_min, z_min = min(cs[:,0]), min(cs[:,1]), min(cs[:,2])
         x_max, y_max, z_max = max(cs[:,0]), max(cs[:,1]), max(cs[:,2])
@@ -65,34 +70,30 @@ class BoxCompressed(StructureFEniCS):
         tol_bc = self.mesh.rmin()/1000.
         
         ### HOMOGENEOUS DR BCs
-        bcs_DR = {}
+        self.bcs_DR = {}
         
         def bottom_plate(x, on_boundary):
             return on_boundary and df.near(x[2], z_min, tol_bc)
         bot_z, bot_z_dofs = boundary_condition(i_u.sub(2), df.Constant(0.0), bottom_plate)
-        bcs_DR.update({'bot_z': {'bc': bot_z, 'bc_dofs': bot_z_dofs}})
+        self.bcs_DR.update({'bot_z': {'bc': bot_z, 'bc_dofs': bot_z_dofs}})
         
         def bottom_x(x): # x-Bewegung = 0
             return (
                 df.near(x[2], z_min, tol_bc) and
                 df.near(x[0], x_min, tol_bc))
         bot_x_ax, bot_x_ax_dofs = boundary_condition_pointwise(i_u.sub(0), df.Constant(0.0), bottom_x)
-        bcs_DR.update({'bot_x_ax': {'bc': bot_x_ax, 'bc_dofs': bot_x_ax_dofs}})
+        self.bcs_DR.update({'bot_x_ax': {'bc': bot_x_ax, 'bc_dofs': bot_x_ax_dofs}})
         
         def bottom_y(x): # y-Bewegung = 0
             return (df.near(x[2], z_min, tol_bc) and
                     df.near(x[1], y_min, tol_bc))
         bot_y_ax, bot_y_ax_dofs = boundary_condition_pointwise(i_u.sub(1), df.Constant(0.0), bottom_y)
-        bcs_DR.update({'bot_y_ax': {'bc': bot_y_ax, 'bc_dofs': bot_y_ax_dofs}})
+        self.bcs_DR.update({'bot_y_ax': {'bc': bot_y_ax, 'bc_dofs': bot_y_ax_dofs}})
         
         ### INHOMOGENEOUS DR BCs
-        bcs_DR_inhom = {}
+        self.bcs_DR_inhom = {}
         
         def top_plate(x, on_boundary):
             return on_boundary and df.near(x[2], z_max, tol_bc)
         top_z, top_z_dofs = boundary_condition(i_u.sub(2), self.u_z_top, top_plate)
-        bcs_DR.update({'top_z': {'bc': top_z, 'bc_dofs': top_z_dofs}})
-        
-        return bcs_DR, bcs_DR_inhom, time_varying_loadings
-    
-
+        self.bcs_DR.update({'top_z': {'bc': top_z, 'bc_dofs': top_z_dofs}})

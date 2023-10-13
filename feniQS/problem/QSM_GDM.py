@@ -104,8 +104,8 @@ class QSModelGDM(QuasiStaticModel):
         To commit BCs and time-varying loadings from structure to the model.
         Also, to handle penalizing DOFs; i.e. putting linear springs at certain DOFs.
         """
-        bcs_hom, bcs_inhom, time_varying_loadings = self.struct.get_BCs(self.fen.get_iu())
-        self.time_varying_loadings.update(time_varying_loadings)
+        bcs_hom, bcs_inhom = self.struct.get_BCs(i_u=self.fen.get_iu(), fresh=True)
+        self.time_varying_loadings.update(self.struct.get_time_varying_loadings())
         bcs_hom = [bc['bc'] for bc in bcs_hom.values()]
         bcs_inhom = [bc['bc'] for bc in bcs_inhom.values()]
         self.revise_BCs(remove=True, new_BCs=bcs_hom, _as='hom')

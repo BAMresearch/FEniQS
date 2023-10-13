@@ -110,22 +110,24 @@ class Slab2D(StructureFEniCS):
             else:
                 raise ValueError(f"Loading control of the structure is not recognized.")
     
-    def get_BCs(self, i_u):
-        assert i_u.num_sub_spaces() == 2
+    def get_time_varying_loadings(self):
         time_varying_loadings = {}
         if self.u_x is not None:
-            time_varying_loadings.update({'x_right': self.u_x})
-        if self.f_x is not None:
-            time_varying_loadings.update({'x_right': self.f_x})
-        
+            time_varying_loadings['x_right'] = self.u_x
+        elif self.f_x is not None:
+            time_varying_loadings['x_right'] = self.f_x
+        return time_varying_loadings
+
+    def build_BCs(self, i_u):
+        assert i_u.num_sub_spaces() == 2
         tol = self.mesh.rmin() / 1000.
         def _left(x, on_boundary):
             return df.near(x[0], 0., tol)
         
-        bcs_DR, bcs_DR_inhom = {}, {}
+        self.bcs_DR, self.bcs_DR_inhom = {}, {}
         
         bc_left_x, bc_left_x_dofs = boundary_condition(i_u.sub(0), df.Constant(0.0), _left)
-        bcs_DR.update({'left_x': {'bc': bc_left_x, 'bc_dofs': bc_left_x_dofs}})
+        self.bcs_DR.update({'left_x': {'bc': bc_left_x, 'bc_dofs': bc_left_x_dofs}})
 
         if 'corner' in self.pars.bc_y_at_left.lower():
             # CASE-1: fixed in corner
@@ -137,15 +139,13 @@ class Slab2D(StructureFEniCS):
             bc_left_y, bc_left_y_dofs = boundary_condition(i_u.sub(1), df.Constant(0.0), _left)
         else:
             raise ValueError(f"The parameter 'pars.bc_y_at_left={self.pars.bc_y_at_left}' is not recognized. Set it to either 'corner' or 'edge'.")
-        bcs_DR.update({'left_y': {'bc': bc_left_y, 'bc_dofs': bc_left_y_dofs}})
+        self.bcs_DR.update({'left_y': {'bc': bc_left_y, 'bc_dofs': bc_left_y_dofs}})
         
         if self.u_x is not None:
             def _right(x, on_boundary):
                 return df.near(x[0], self.pars.lx, tol)
             bc_right_x, bc_right_x_dofs = boundary_condition(i_u.sub(0), self.u_x, _right)
-            bcs_DR_inhom.update({'right_x': {'bc': bc_right_x, 'bc_dofs': bc_right_x_dofs}})
-        
-        return bcs_DR, bcs_DR_inhom, time_varying_loadings
+            self.bcs_DR_inhom.update({'right_x': {'bc': bc_right_x, 'bc_dofs': bc_right_x_dofs}})
     
     def get_reaction_nodes(self, reaction_places):
         nodes = []
