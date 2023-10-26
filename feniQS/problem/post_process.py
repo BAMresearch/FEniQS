@@ -218,12 +218,14 @@ class PostProcessGradientDamage(PostProcess):
             ebar_plot = self.fen.u_mix.split()[1]
             self.xdmf.write(ebar_plot, t)
             if self.fen.hist_storage=='quadrature':
-                df.project(v=self.fen.u_K_current, V=self._q_space, function=self.K) # projection
+                df.project(v=self.fen.u_K_current, V=self._q_space, function=self.K \
+                    , form_compiler_parameters={"quadrature_degree":self.fen.integ_degree, "quad_scheme":"default"})
                 self.xdmf.write(self.K, t)
             else:
                 self.xdmf.write(self.fen.u_K_current, t) # This does not work for "u_K_current" being in quadrature space
             D_ufl = self.fen.mat.gK.g(self.fen.u_K_current)
-            df.project(v=D_ufl, V=self._q_space, function=self.D) # projection
+            df.project(v=D_ufl, V=self._q_space, function=self.D \
+                , form_compiler_parameters={"quadrature_degree":self.fen.integ_degree, "quad_scheme":"default"})
             self.xdmf.write(self.D, t)
 
 class PostProcessPlastic(PostProcess):
@@ -242,10 +244,14 @@ class PostProcessPlastic(PostProcess):
     def __call__(self, t, logger):
         super().__call__(t, logger)
         if self.write_files:
-            ### project from quadrature space to DG-0 space
-            df.project(v=self.fen.sig, V=self.i_ss, function=self.sig)
-            df.project(v=self.fen.eps_p, V=self.i_ss, function=self.eps_p)
-            df.project(v=self.fen.kappa, V=self.i_k, function=self.K)
+            ### project from quadrature space to DG space
+            form_compiler_parameters = {"quadrature_degree":self.fen.integ_degree, "quad_scheme":"default"}
+            df.project(v=self.fen.sig, V=self.i_ss, function=self.sig \
+                , form_compiler_parameters=form_compiler_parameters)
+            df.project(v=self.fen.eps_p, V=self.i_ss, function=self.eps_p \
+                , form_compiler_parameters=form_compiler_parameters)
+            df.project(v=self.fen.kappa, V=self.i_k, function=self.K \
+                , form_compiler_parameters=form_compiler_parameters)
             ### write projected values to xdmf-files
             self.xdmf.write(self.K, t)
             self.xdmf.write(self.sig, t)
@@ -274,12 +280,18 @@ class PostProcessPlasticGDM(PostProcess):
     def __call__(self, t, logger):
         super().__call__(t, logger)
         if self.write_files:
-            ### project from quadrature space to DG-0 space
-            df.project(v=self.fen.q_sigma, V=self.i_ss, function=self.sig)
-            df.project(v=self.fen.q_k, V=self.i_k, function=self.Kd)
-            df.project(v=self.fen.mat.gK.g(self.fen.q_k), V=self.i_k, function=self.D)
-            df.project(v=self.fen.q_eps_p, V=self.i_ss, function=self.eps_p)
-            df.project(v=self.fen.q_k_plastic, V=self.i_k, function=self.Kp)
+            ### project from quadrature space to DG space
+            form_compiler_parameters = {"quadrature_degree":self.fen.integ_degree, "quad_scheme":"default"}
+            df.project(v=self.fen.q_sigma, V=self.i_ss, function=self.sig \
+                , form_compiler_parameters=form_compiler_parameters)
+            df.project(v=self.fen.q_k, V=self.i_k, function=self.Kd \
+                , form_compiler_parameters=form_compiler_parameters)
+            df.project(v=self.fen.mat.gK.g(self.fen.q_k), V=self.i_k, function=self.D \
+                , form_compiler_parameters=form_compiler_parameters)
+            df.project(v=self.fen.q_eps_p, V=self.i_ss, function=self.eps_p \
+                , form_compiler_parameters=form_compiler_parameters)
+            df.project(v=self.fen.q_k_plastic, V=self.i_k, function=self.Kp \
+                , form_compiler_parameters=form_compiler_parameters)
             
             ### write projected values to xdmf-files
             self.xdmf.write(self.sig, t)
