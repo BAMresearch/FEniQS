@@ -4,6 +4,27 @@ import dolfin as df
 pth_helper_mesh_fenics = CollectPaths('./feniQS/structure/helper_mesh_fenics.py')
 pth_helper_mesh_fenics.add_script(pth_helper_mesh_gmsh_meshio)
 
+def one_cell_mesh_2D(x1, y1, x2, y2, x3, y3):
+    """
+    Returns a fenics mesh object made of only ONE triangle cell,
+    whose vertices have the coordinates (x1, y1), (x2, y2), and (x3, y3).
+    """
+    p1 = df.Point(x1, y1)
+    p2 = df.Point(x2, y2)
+    p3 = df.Point(x3, y3)
+    mesh = df.Mesh()
+    editor = df.MeshEditor()
+    editor.open(mesh, 'triangle', 2, 2) # A 2D triangular mesh
+    editor.init_vertices(3)
+    editor.init_cells(1)
+    editor.add_vertex(0, p1)
+    editor.add_vertex(1, p2)
+    editor.add_vertex(2, p3)
+    editor.add_cell(0, [0, 1, 2])
+    editor.close()
+    return mesh
+
+
 def bcc_mesh_parametric(r_strut, l_rve, n_rve, l_cell, add_plates=True, shape_name="bcc" \
              , _path='./', _name='parametric_bcc'):
     ff_msh = gmshAPI_generate_bcc_lattice(r_strut=r_strut, l_rve=l_rve, n_rve=n_rve \
