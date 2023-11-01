@@ -47,9 +47,20 @@ ids_x = [dofs_cell.index(i) for i in dofs_x]
 ids_y = [dofs_cell.index(i) for i in dofs_y]
 R_x = R_local[ids_x]
 R_y = R_local[ids_y]
+cs = i_u.tabulate_dof_coordinates()
+cs_x = cs[dofs_x, :]
+cs_y = cs[dofs_y, :]
+rot = 0. # rotational momentum
+for f, r in zip(R_x, cs_x):
+    rot += - f * r[1] # clockwise
+for f, r in zip(R_y, cs_y):
+    rot += f * r[0] # counter-clockwise
 
 ### CHECK STATIC BALANCE ###
     # Translational
+print(f"Sum of translational forces (fx, fy) = ({sum(R_x):.1e}, {sum(R_y):.1e})")
 assert abs(sum(R_x)) < 1e-10
 assert abs(sum(R_y)) < 1e-10
     # Rotational (to be done ...)
+print(f"Rotational momentum = {rot:.1e}")
+assert abs(rot) < 1e-10
