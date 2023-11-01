@@ -61,6 +61,6 @@ for f, r in zip(R_y, cs_y):
 print(f"Sum of translational forces (fx, fy) = ({sum(R_x):.1e}, {sum(R_y):.1e})")
 assert abs(sum(R_x)) < 1e-10
 assert abs(sum(R_y)) < 1e-10
-    # Rotational (to be done ...)
+    # Rotational
 print(f"Rotational momentum = {rot:.1e}")
 assert abs(rot) < 1e-10
