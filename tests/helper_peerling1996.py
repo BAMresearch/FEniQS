@@ -146,7 +146,7 @@ class DispEbarKappaDamageOverX_ReactionForces_GradientDamage:
         D_vals = [self.fen.mat.gK.g_eval(K) for K in K_vals]
         self.D.append( D_vals )
         
-        reaction_force, _ = compute_residual(F=self.fen.F_u+self.fen.F_ebar \
+        reaction_force, _ = compute_residual(F=self.fen.get_F_and_u()[0] \
                                              , bcs_dofs=self.fen.bcs_DR_dofs + self.fen.bcs_DR_inhom_dofs \
                                              , reaction_dofs=[self.reaction_dofs], logger=logger, write_residual_vector=write_residual_vector)
         self.reaction_forces.append(reaction_force[0])
