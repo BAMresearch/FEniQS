@@ -52,18 +52,18 @@ class FenicsPlastic(FenicsProblem, df.NonlinearProblem):
         self.hist_storage = 'quadrature' # always is quadrature
         if integ_degree is None:
             integ_degree = self.shF_degree_u + 1
-        f = FenicsProblem.build_variational_functionals(self, f, integ_degree) # includes a call for discretize method
+        FenicsProblem.build_variational_functionals(self, f, integ_degree) # includes discritization & building external forces
         
         df.parameters["form_compiler"]["representation"] = "quadrature"
         import warnings
         from ffc.quadrature.deprecation import QuadratureRepresentationDeprecationWarning
         warnings.simplefilter("once", QuadratureRepresentationDeprecationWarning)
         
-        self.a_Newton = expr_sigma_scale * df.inner(eps_vector(self.v, self.mat.constraint), df.dot(self.Ct, eps_vector(self.u_, self.mat.constraint))) * self.dxm
-        self.res = expr_sigma_scale * ( df.inner(eps_vector(self.u_, self.mat.constraint), self.sig) - df.inner(f, self.u_) ) * self.dxm
-        ## add Neumann BC. terms (if any exist)
-        for i, t in enumerate(self.bcs_NM_tractions):
-            self.res += df.dot(t, self.v_u) * self.bcs_NM_measures[i]
+        self.a_Newton = expr_sigma_scale * df.inner(eps_vector(self.v, self.mat.constraint), df.dot(self.Ct, eps_vector(self.v_u, self.mat.constraint))) * self.dxm
+        self._F_int = expr_sigma_scale * df.inner(eps_vector(self.v_u, self.mat.constraint), self.sig) * self.dxm
+    
+    def get_solution_field(self):
+        return self.u_u
         
     def discretize(self):
         ### Nodal spaces / functions
@@ -73,9 +73,9 @@ class FenicsPlastic(FenicsProblem, df.NonlinearProblem):
             elem_u = df.VectorElement(self.el_family, self.mesh.ufl_cell(), self.shF_degree_u, dim=self.dep_dim)
         self.i_u = df.FunctionSpace(self.mesh, elem_u)
         # Define functions
-        self.u = df.Function(self.i_u, name="Displacement at last global NR iteration")
+        self.u_u = df.Function(self.i_u, name="Displacement at last global NR iteration")
         self.v = df.TrialFunction(self.i_u)
-        self.u_ = df.TestFunction(self.i_u)
+        self.v_u = df.TestFunction(self.i_u)
         
         ### Quadrature spaces / functions
         # for sigma and strain
@@ -108,8 +108,8 @@ class FenicsPlastic(FenicsProblem, df.NonlinearProblem):
     
     def build_solver(self, solver_options=None, time_varying_loadings=[]):
         FenicsProblem.build_solver(self, time_varying_loadings)
-        self.projector_eps = LocalProjector(eps_vector(self.u, self.mat.constraint), self.i_ss, self.dxm)
-        self.assembler = df.SystemAssembler(self.a_Newton, self.res, self.bcs_DR + self.bcs_DR_inhom)
+        self.projector_eps = LocalProjector(eps_vector(self.u_u, self.mat.constraint), self.i_ss, self.dxm)
+        self.assembler = df.SystemAssembler(self.a_Newton, self.get_F_and_u()[0], self.bcs_DR + self.bcs_DR_inhom)
         if solver_options is None:
             solver_options = get_fenicsSolverOptions()
         self.solver = get_nonlinear_solver(solver_options=solver_options, mpi_comm=self.mesh.mpi_comm())
@@ -168,16 +168,13 @@ class FenicsPlastic(FenicsProblem, df.NonlinearProblem):
     
     def get_i_full(self):
         return self.i_u
-
-    def get_F_and_u(self):
-        return self.res, self.u
     
     def get_uu(self):
-        return self.u
+        return self.u_u
     
     def get_iu(self, _collapse=True):
         return self.i_u
     
     def reset_fields(self, u0=0.0):
         # u0 can be a vector of the same length as self.u_u
-        self.u.vector()[:] = u0
+        self.u_u.vector()[:] = u0

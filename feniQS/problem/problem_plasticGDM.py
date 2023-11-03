@@ -58,12 +58,12 @@ class FenicsPlasticGDM(FenicsProblem):
         eps_v = eps_vector(self.v_u, self.mat.constraint) # regarding test function
         eps_d = eps_vector(self.d_u, self.mat.constraint) # regarding trial function
         c_total = self.mat.c_min + self.mat.c
-        ### nonlinear terms in self.R (needed to be updated/resolved):
+        ### nonlinear terms in self._F_int (needed to be updated/resolved):
             # self.q_sigma
             # self.q_eeq
-        self.R = expr_sigma_scale * df.inner(eps_v, self.q_sigma) * self.dxm
-        self.R += self.v_ebar * (self.u_ebar - self.q_eeq) * self.dxm
-        self.R += df.dot(df.grad(self.v_ebar), c_total * df.grad(self.u_ebar)) * self.dxm
+        self._F_int = expr_sigma_scale * df.inner(eps_v, self.q_sigma) * self.dxm
+        self._F_int += self.v_ebar * (self.u_ebar - self.q_eeq) * self.dxm
+        self._F_int += df.dot(df.grad(self.v_ebar), c_total * df.grad(self.u_ebar)) * self.dxm
         
         ### nonlinear terms in self.dR (needed to be updated/resolved):
             # self.q_dsigma_deps
@@ -79,7 +79,10 @@ class FenicsPlasticGDM(FenicsProblem):
         ### Set projectors ########### better to be in build_solver
         self.projector_eps = LocalProjector(eps_u, self.i_ss, self.dxm)
         self.projector_ebar = LocalProjector(self.u_ebar, self.i_hist, self.dxm)
-        
+    
+    def get_solution_field(self):
+        return self.u_mix
+
     def discretize(self):
         ### Nodal spaces / functions
         if self.dep_dim == 1:
@@ -148,7 +151,7 @@ class FenicsPlasticGDM(FenicsProblem):
         self.solver = 'Manually implemented' # We perform a NR-solver manually in self.solve().
         if len(self.bcs_DR + self.bcs_DR_inhom) == 0:
             print('WARNING: No boundary conditions have been set to the FEniCS problem.')
-        self.assembler = df.SystemAssembler(self.dR, self.R, self.bcs_DR + self.bcs_DR_inhom)
+        self.assembler = df.SystemAssembler(self.dR, self.get_F_and_u()[0], self.bcs_DR + self.bcs_DR_inhom)
         self.A = df.PETScMatrix() # to initiate
         self.b = df.PETScVector() # to initiate
         self.sol_tol = tol
@@ -174,7 +177,7 @@ class FenicsPlasticGDM(FenicsProblem):
                 # project the corresponding quantities to quadrature space
                 self.projector_eps(self.q_eps)
                 self.projector_ebar(self.q_e)
-                # resolve damage law and update relevant quantities appearing in self.R and self.dR
+                # resolve damage law and update relevant quantities appearing in self._F_int and self.dR
                 self._resolve_damage()
                 # update Newton system (residual and A matrix) for next iteration
                 self.assembler.assemble(self.A)
@@ -192,7 +195,7 @@ class FenicsPlasticGDM(FenicsProblem):
     
     def _resolve_damage(self):
         """
-        This resolves the damage and updates relevant varying quantities appearing in self.R and self.dR .
+        This resolves the damage and updates relevant varying quantities appearing in self._F_int and self.dR .
         """
         eps = self.q_eps.vector().get_local().reshape((-1, self.mat.ss_dim))
         eps_p = self.q_eps_p.vector().get_local().reshape((-1, self.mat.ss_dim))
@@ -236,9 +239,6 @@ class FenicsPlasticGDM(FenicsProblem):
         self.q_k_plastic.vector()[:] = self.num_k1_plastic
         self.q_eps_p.vector()[:] = self.q_eps_p.vector()[:] + self.d_eps_p_num.flatten()
         # postprocessing results
-        
-    def get_F_and_u(self):
-        return self.R, self.u_mix
     
     def get_uu(self, _deepcopy=True):
         return self.u_mix.split(deepcopy=_deepcopy)[0]

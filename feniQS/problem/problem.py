@@ -152,12 +152,6 @@ class FenicsProblem():
         return 2. * self.penalty_weight.values()[0] * du
     
     def build_variational_functionals(self, f, integ_degree):
-        if f is None:
-            if self.dep_dim == 1:
-                f = df.Constant(0.0)
-            else:
-                f = df.Constant(self.dep_dim * (0.0, ))
-        
         if integ_degree is None:
             self.dxm = df.dx(self.mesh)
             self.integ_degree = 'default'
@@ -166,10 +160,23 @@ class FenicsProblem():
             self.dxm = self.quad_measure(integration_degree = integ_degree)
             self.integ_degree = integ_degree
             df.parameters["form_compiler"]["quadrature_degree"] = self.integ_degree
-        
         self.discretize()
+        self._build_external_forces(f)
+
+    def _build_external_forces(self, f):
+        ### Volume forces
+        if f is None:
+            if self.dep_dim == 1:
+                f = df.Constant(0.0)
+            else:
+                f = df.Constant(self.dep_dim * (0.0, ))
+        self._F_ext = df.inner(f, self.v_u) * self.dxm
         
-        ## Concentrated forces using Dirac-delta approach.
+        ### Neumann BCs or traction forces (if any exist)
+        for i, t in enumerate(self.bcs_NM_tractions):
+            self._F_ext += df.dot(t, self.v_u) * self.bcs_NM_measures[i]
+
+        ### Concentrated forces (using Dirac-delta approach)
         _radius = self.mesh.rmax()
         if self.dep_dim==1:
             self.fs_concentrated = 0. # default
@@ -193,8 +200,7 @@ class FenicsProblem():
                     _dir = {'x': 0, 'y': 1, 'z': 2}[direction.lower()]
                     _f[_dir] = fs
             self.fs_concentrated = df.as_vector(tuple(_f))
-        
-        return f
+        self._F_ext += df.inner(self.fs_concentrated, self.v_u) * self.dxm
     
     def discretize(self):
         pass
@@ -229,22 +235,34 @@ class FenicsProblem():
     
     def get_F_and_u(self):
         # To get the total variational functional (F=0) and its main unknown function
-        pass
+        return self.get_internal_forces() - self.get_external_forces(), self.get_solution_field()
+    
+    def get_external_forces(self):
+        return self._F_ext
+    
+    def get_internal_forces(self):
+        if hasattr(self, '_F_int'):
+            return self._F_int
+        else:
+            raise NotImplementedError(f"No attribute of '_F_int' regarding the 'internal force' has been built for the problem.")
+    
+    def get_solution_field(self):
+        raise NotImplementedError()
     
     def get_uu(self, _deepcopy=True):
         # To get the "plottable" function of displacement field (u_u).
-        pass
+        raise NotImplementedError()
     
     def get_iu(self, _collapse=False):
         # To get the displacement field's function-space (i_u).
-        pass
+        raise NotImplementedError()
     
     def reaction_force(self, bc_measure): ### !!!! has inaccuracy !!!
         n = df.FacetNormal(self.mesh)
         return df.assemble(df.dot(df.dot(self.sig_u, n), n) * bc_measure)
     
     def reset_fields(self):
-        pass
+        raise NotImplementedError()
         
     def quad_measure(self, integration_degree=1, domain=None):
         if domain is None:
@@ -318,22 +336,18 @@ class FenicsElastic(FenicsProblem):
                                , penalty_dofs=penalty_dofs, penalty_weight=penalty_weight)
         
     def build_variational_functionals(self, f=None, integ_degree=None, expr_sigma_scale=1):
-        f = FenicsProblem.build_variational_functionals(self, f, integ_degree)  # includes discritization
-        
+        FenicsProblem.build_variational_functionals(self, f, integ_degree) # includes discritization & building external forces
+        ## Internal forces
         self.sig_u = expr_sigma_scale * self.mat.sigma(self.u_u)
         eps_v = epsilon(self.v_u, _dim=self.dep_dim)
-        a_u = df.inner(self.sig_u, eps_v) * self.dxm
-        self.L_u = df.inner(f, self.v_u) * self.dxm
-        ## add Neumann BC. terms (if any exist)
-        for i, t in enumerate(self.bcs_NM_tractions):
-            self.L_u += df.dot(t, self.v_u) * self.bcs_NM_measures[i]
-        self.F_u = a_u - self.L_u
-        self._set_K_tangential() # The K_tangential is not affected by fs_concentrated, so, is set before adding fs_concentrated.
-        ## add concentrated forces
-        self.L_u += df.inner(self.fs_concentrated, self.v_u) * self.dxm
-        self.F_u = a_u - self.L_u
+        self._F_int = df.inner(self.sig_u, eps_v) * self.dxm
+        ## Stiffness matrix
+        self._set_K_tangential()
         self._assemble_K_t()
     
+    def get_solution_field(self):
+        return self.u_u
+
     def discretize(self):
         if self.dep_dim == 1:
             elem_u = df.FiniteElement(self.el_family, self.mesh.ufl_cell(), self.shF_degree_u)
@@ -355,7 +369,7 @@ class FenicsElastic(FenicsProblem):
         lin_so = solver_options['lin_sol_options']
         self.is_default_lin_sol = is_default_lin_sol_options(lin_so)
         if self.is_default_lin_sol:
-            problem = df.LinearVariationalProblem(a=self.K_t_form, L=self.L_u, u=self.u_u, bcs=self.bcs_DR + self.bcs_DR_inhom)
+            problem = df.LinearVariationalProblem(a=self.K_t_form, L=self.get_external_forces(), u=self.u_u, bcs=self.bcs_DR + self.bcs_DR_inhom)
             self.solver = df.LinearVariationalSolver(problem)
             self.solver.parameters['krylov_solver']["maximum_iterations"] = lin_so['max_iters']
             self.solver.parameters['krylov_solver']["absolute_tolerance"]   = lin_so['tol_abs']
@@ -380,7 +394,7 @@ class FenicsElastic(FenicsProblem):
             _it = 0
         else:
             try:
-                self.solver.assemble(self.K_t_form, self.L_u, self.bcs_DR + self.bcs_DR_inhom)
+                self.solver.assemble(self.K_t_form, self.get_external_forces(), self.bcs_DR + self.bcs_DR_inhom)
                 self.solver(self.u_u)
                 conv = True; _it = -1
             except:
@@ -391,9 +405,6 @@ class FenicsElastic(FenicsProblem):
     
     def get_i_full(self):
         return self.i_u
-    
-    def get_F_and_u(self):
-        return self.F_u, self.u_u
     
     def get_uu(self):
         return self.u_u
@@ -443,21 +454,13 @@ class FenicsGradientDamage(FenicsProblem, df.NonlinearProblem):
                 # defining 'self.i_K' and performing the integration.
                 integ_degree = max(self.shF_degree_u, self.shF_degree_ebar) + 1
         
-        f = FenicsProblem.build_variational_functionals(self, f, integ_degree) # includes discritization
+        FenicsProblem.build_variational_functionals(self, f, integ_degree) # includes discritization & building external forces
         
         ### for the first field
         u_Kmax = GradientDamageConstitutive.update_K(self.u_K_current, self.u_ebar) # based on the second field (u_ebar)
         self.sig_u = expr_sigma_scale * self.mat.sigma(self.u_u, u_Kmax)
         eps_v = epsilon(self.v_u, _dim=self.dep_dim)
-        a_u = df.inner(self.sig_u, eps_v) * self.dxm
-        L_u = df.inner(f, self.v_u) * self.dxm
-        ## add Neumann BC. terms (if any exist)
-        for i, t in enumerate(self.bcs_NM_tractions):
-            L_u += df.dot(t, self.v_u) * self.bcs_NM_measures[i]
-        ## add concentrated forces
-        L_u += df.inner(self.fs_concentrated, self.v_u) * self.dxm
-        
-        self.F_u = a_u - L_u
+        self._F_u = df.inner(self.sig_u, eps_v) * self.dxm
         
         ### for the second field
         c_gdm = self.mat.c_min + self.mat.c
@@ -469,18 +472,18 @@ class FenicsGradientDamage(FenicsProblem, df.NonlinearProblem):
         # a_ebar += c_gdm * inner(dot(grad(self.u_ebar), normal_vector), self.v_ebar) * ds(self.mesh) # For natural boundary conditions
         # eps_eq = self.mat.epsilon_eq(epsilon(self.u_u, _dim=self.dep_dim))
         # L_ebar = inner(eps_eq, self.v_ebar) * self.dxm # Here "eps_eq" is similar to an external force applying to the second field system
-        # self.F_ebar = a_ebar - L_ebar
+        # self._F_ebar = a_ebar - L_ebar
         ## APPROACH 2: after applying divergence theorem
         a_ebar = df.inner(self.u_ebar, self.v_ebar) * self.dxm
         interaction = self.mat.interaction_function(self.mat.gK.g(u_Kmax))
         a_ebar += c_gdm * interaction * df.dot(grad(self.u_ebar), grad(self.v_ebar)) * self.dxm
         eps_eq = self.mat.epsilon_eq(epsilon(self.u_u, _dim=self.dep_dim))
         L_ebar = df.inner(eps_eq, self.v_ebar) * self.dxm # Here "eps_eq" is similar to an external force applying to the second field system
-        self.F_ebar = self.ebar_residual_weight * (a_ebar - L_ebar)
+        self._F_ebar = self.ebar_residual_weight * (a_ebar - L_ebar)
         
-        self._F_total = self.F_u + self.F_ebar
+        self._F_int = self._F_u + self._F_ebar # Minor inaccuracy: we actually consider the external forces of 'ebar' equation also within internal forces!
         
-        self._set_K_tangential() # it is always needed for bulding the solver
+        self._set_K_tangential()
         self._assemble_K_t()
         
         if self.jac_prep:
@@ -489,6 +492,9 @@ class FenicsGradientDamage(FenicsProblem, df.NonlinearProblem):
             self.dKmax_dK0 = np.zeros(self.i_K.dim()) # initiation
             self._set_dKmax_du(u_Kmax) # includes initiation of self.dKmax_du
             self.last_K0 = self.u_K_current.copy(deepcopy=True) # only needed for test purposes
+    
+    def get_solution_field(self):
+        return self.u_mix
         
     def discretize(self):
         if self.dep_dim == 1:
@@ -543,10 +549,6 @@ class FenicsGradientDamage(FenicsProblem, df.NonlinearProblem):
     
     def get_i_full(self):
         return self.i_mix
-    
-    def get_F_and_u(self):
-        return self._F_total, self.u_mix
-        # return self.F_u + self.F_ebar, self.u_mix
     
     def get_uu(self, _deepcopy=True):
         return self.u_mix.split(deepcopy=_deepcopy)[0]

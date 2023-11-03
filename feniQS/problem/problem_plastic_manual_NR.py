@@ -11,7 +11,7 @@ class FenicsPlastic(FenicsProblem):
     def __init__(self, mat, mesh, fen_config, dep_dim=None):
         super().__init__(mat, mesh, fen_config, dep_dim)
     
-    def build_variational_functionals(self, f=None, integ_degree=None):
+    def build_variational_functionals(self, f=None, integ_degree=None, expr_sigma_scale=1.):
         self.hist_storage = 'quadrature' # always is quadrature
         if integ_degree is None:
             integ_degree = self.shF_degree_u + 1
@@ -22,9 +22,12 @@ class FenicsPlastic(FenicsProblem):
         from ffc.quadrature.deprecation import QuadratureRepresentationDeprecationWarning
         warnings.simplefilter("once", QuadratureRepresentationDeprecationWarning)
         
-        self.a_Newton = df.inner(eps_vector(self.v, self.mat.constraint), df.dot(self.Ct, eps_vector(self.u_, self.mat.constraint))) * self.dxm
-        self.res = ( df.inner(eps_vector(self.u_, self.mat.constraint), self.sig1) - df.inner(f, self.u_) ) * self.dxm
-        
+        self.a_Newton = expr_sigma_scale * df.inner(eps_vector(self.v, self.mat.constraint), df.dot(self.Ct, eps_vector(self.v_u, self.mat.constraint))) * self.dxm
+        self._F_int = expr_sigma_scale * df.inner(eps_vector(self.v_u, self.mat.constraint), self.sig1) * self.dxm
+    
+    def get_solution_field(self):
+        return self.u_u
+
     def discretize(self):
         ### Nodal spaces / functions
         if self.dep_dim == 1:
@@ -33,11 +36,11 @@ class FenicsPlastic(FenicsProblem):
             elem_u = df.VectorElement(self.el_family, self.mesh.ufl_cell(), self.shF_degree_u, dim=self.dep_dim)
         self.i_u = df.FunctionSpace(self.mesh, elem_u)
         # Define functions
-        self.u = df.Function(self.i_u, name="Converged displacement at the end of time-step")
+        self.u_u = df.Function(self.i_u, name="Converged displacement at the end of time-step")
         self.u1 = df.Function(self.i_u, name="Current displacement at last global NR iteration")
         self.du = df.Function(self.i_u, name="Correction in global NR iteration")
         self.v = df.TrialFunction(self.i_u)
-        self.u_ = df.TestFunction(self.i_u)
+        self.v_u = df.TestFunction(self.i_u)
         
         ### Quadrature spaces / functions
         # for sigma and strain
@@ -70,13 +73,13 @@ class FenicsPlastic(FenicsProblem):
         self.Ct.vector().set_local(self.Ct_num.flatten()) # assign the helper "Ct_num" to "Ct"
         self.sig1_num = np.zeros((self.ngauss, self.mat.ss_dim)) # this is just helpfull for assigning to self.sig1
     
-    def build_solver(self, time_varying_loadings=[], tol=1e-12):
+    def build_solver(self, solver_options=None, time_varying_loadings=[], tol=1e-12):
         FenicsProblem.build_solver(self, time_varying_loadings)
         self.solver = 'Manually implemented' # We perform a NR-solver manually in self.solve().
         self.projector_eps = LocalProjector(eps_vector(self.u1, self.mat.constraint), self.i_ss, self.dxm)
         if len(self.bcs_DR + self.bcs_DR_inhom) == 0:
             print('WARNING: No boundary conditions have been set to the FEniCS problem.')
-        self.assembler = df.SystemAssembler(self.a_Newton, self.res, self.bcs_DR + self.bcs_DR_inhom)
+        self.assembler = df.SystemAssembler(self.a_Newton, self.get_F_and_u()[0], self.bcs_DR + self.bcs_DR_inhom)
         self.A = df.PETScMatrix() # to initiate
         self.b = df.PETScVector() # to initiate
         self.sol_tol = tol
@@ -85,7 +88,7 @@ class FenicsPlastic(FenicsProblem):
         FenicsProblem.solve(self, t)
         conv = False
         it = 0
-        self.u1.assign(self.u)
+        self.u1.assign(self.u_u)
         self.assembler.assemble(self.A)
         self.assembler.assemble(self.b, self.u1.vector())
         nRes0 = self.b.norm("l2")
@@ -149,16 +152,23 @@ class FenicsPlastic(FenicsProblem):
         self.Ct.vector().set_local(self.Ct_num.flatten())
     
     def _todo_after_convergence(self):
-        self.u.assign(self.u1)
+        self.u_u.assign(self.u1)
         self.kappa.vector()[:] = self.kappa1
         self.sig.vector()[:] = self.sig1.vector().get_local()
         self.eps.vector()[:] = self.eps1.vector().get_local()
         self.eps_p.vector()[:] = self.eps_p.vector()[:] + self.d_eps_p_num.flatten()
         # postprocessing results
-        
-    def get_F_and_u(self):
-        return self.res, self.u
+    
+    def get_i_full(self):
+        return self.i_u
     
     def get_uu(self):
-        return self.u
+        return self.u_u
+    
+    def get_iu(self, _collapse=True):
+        return self.i_u
+    
+    def reset_fields(self, u0=0.0):
+        # u0 can be a vector of the same length as self.u_u
+        self.u_u.vector()[:] = u0
     
