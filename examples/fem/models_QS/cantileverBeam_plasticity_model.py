@@ -141,7 +141,7 @@ class CantileverBeamPlasticModel:
             = load_and_bcs_on_cantileverBeam3d(mesh, self.pars.lx, self.pars.ly, self.pars.lz, self.fen.i_u, self.load_expr)
         
         #### BUILD SOLVER ###
-        self.fen.build_solver(time_varying_loadings=[self.load_expr], tol=self.pars.sol_tol)
+        self.fen.build_solver(time_varying_loadings=[self.load_expr])
     
     def solve(self, t_end, checkpoints=[], t_start=0, dt=None, reaction_dofs=[], \
               time_adjusting_methods=[], time_adjusting_args={}, other_pps=[], _reset=True):
@@ -223,7 +223,7 @@ if __name__ == "__main__":
     checkpoints = []
     reaction_dofs = [model.fen.bcs_DR_inhom_dofs]
     aa = read_ref_sol_MATLAB()
-    # pps, plots_data = model.solve(pars.loading.t_end, reaction_dofs=reaction_dofs, checkpoints=checkpoints)
+    pps, plots_data = model.solve(pars.loading.t_end, reaction_dofs=reaction_dofs, checkpoints=checkpoints)
     
     ## print out minimum and maximum reaction forces
     ff = [sum(ri) for ri in pps[0].reaction_forces[0]]
