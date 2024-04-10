@@ -91,7 +91,6 @@ class FenicsElasticShell(FenicsProblem):
             self.solver.parameters['krylov_solver']["relative_tolerance"]   = lin_so['tol_rel']
             self.solver.parameters['krylov_solver']["error_on_nonconvergence"]   = lin_so['allow_nonconvergence_error']
             # self.solver.parameters['lu_solver']["verbose"] = True
-                        
         else:
             if not (df.has_krylov_solver_method(lin_so['method']) or
                     df.has_krylov_solver_preconditioner(lin_so['precon'])):
@@ -121,11 +120,14 @@ class FenicsElasticShell(FenicsProblem):
     def get_i_full(self):
         return self.i_mix
     
-    def get_uu(self):
-        return self.u_u
+    def get_uu(self, _deepcopy=True):
+        return self.u_mix.split(deepcopy=_deepcopy)[0]
     
-    def get_iu(self, _collapse=True):
-        return self.i_u
+    def get_iu(self, _collapse=False):
+        iu = self.i_mix.sub(0)
+        if _collapse:
+            iu = iu.collapse()
+        return iu
     
     def reset_fields(self, u0=0.0):
         # u0 can be a vector of the same length as self.u_u
