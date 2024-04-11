@@ -44,3 +44,33 @@ class DoitTaskManager:
     def get_uptodate(self):
         nst = self.num_sub_tasks
         return [[True] for i in range(nst)]
+
+
+def run_pydoit_task(dict_tasks, basename='', verbosity=2):
+    """
+    Source:
+        https://pydoit.org/extending.html#example-pre-defined-task
+    """
+    import types
+    if isinstance(dict_tasks, DoitTaskManager):
+        dict_tasks = dict_tasks.get_task_dict()
+    elif callable(dict_tasks):
+        dict_tasks = dict_tasks()
+    if not (isinstance(dict_tasks, list) or isinstance(dict_tasks, types.GeneratorType)):
+        dict_tasks = [dict_tasks]
+    from doit.task import dict_to_task
+    from doit.cmd_base import TaskLoader2
+    from doit.doit_cmd import DoitMain
+    class MyLoader(TaskLoader2):
+        def setup(self, opt_values):
+            pass
+        def load_doit_config(self):
+            return {'verbosity': verbosity,}
+        def load_tasks(self, cmd, pos_args):
+            task_list = []
+            for td in dict_tasks:
+                if basename!='':
+                    td['name'] = f"{basename}:{td['name']}"
+                task_list.append(dict_to_task(td))
+            return task_list
+    DoitMain(MyLoader()).run([])
