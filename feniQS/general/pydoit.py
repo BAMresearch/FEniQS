@@ -46,18 +46,24 @@ class DoitTaskManager:
         return [[True] for i in range(nst)]
 
 
-def run_pydoit_task(dict_tasks, basename='', verbosity=2):
+def run_pydoit_task(tasks, basename, verbosity=2):
     """
     Source:
         https://pydoit.org/extending.html#example-pre-defined-task
     """
     import types
-    if isinstance(dict_tasks, DoitTaskManager):
-        dict_tasks = dict_tasks.get_task_dict()
-    elif callable(dict_tasks):
-        dict_tasks = dict_tasks()
-    if not (isinstance(dict_tasks, list) or isinstance(dict_tasks, types.GeneratorType)):
-        dict_tasks = [dict_tasks]
+    if not isinstance(tasks, list):
+        tasks = [tasks]
+    def _adjust(task):
+        if isinstance(task, DoitTaskManager):
+            t = task.get_task_dict()
+        elif callable(task):
+            t = task()
+        else:
+            t = task
+        if not (isinstance(t, list) or isinstance(t, types.GeneratorType)):
+            t = [t]
+        return t
     from doit.task import dict_to_task
     from doit.cmd_base import TaskLoader2
     from doit.doit_cmd import DoitMain
@@ -68,9 +74,11 @@ def run_pydoit_task(dict_tasks, basename='', verbosity=2):
             return {'verbosity': verbosity,}
         def load_tasks(self, cmd, pos_args):
             task_list = []
-            for td in dict_tasks:
-                if basename!='':
-                    td['name'] = f"{basename}:{td['name']}"
-                task_list.append(dict_to_task(td))
+            for task in tasks: # by itself can have subtasks or a single task
+                t = _adjust(task) # get genarator of subtasks, or a list of a single task
+                for td in t:
+                    if basename!='':
+                        td['name'] = f"{basename}:{td['name']}"
+                    task_list.append(dict_to_task(td))
             return task_list
     DoitMain(MyLoader()).run([])
