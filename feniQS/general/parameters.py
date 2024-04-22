@@ -38,7 +38,7 @@ def get_hashable_of_dict(dict_obj):
                     v = handle_value(v)
                 keys.append(k)
                 vals.append(v)
-            return keys, vals
+            return zip(*sorted(zip(keys, vals))) # We sort both according to order of keys.
         keys, vals = handle_dict(dict_obj.items())
         # return (tuple(keys), tuple(vals))
         return (tuple(['dict_keys']+[kk for kk in keys]), tuple(['dict_values']+[vv for vv in vals]))
