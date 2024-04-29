@@ -103,7 +103,8 @@ class FenicsProblem():
         else:
             self.dep_dim = dep_dim
         
-        assert(self.dep_dim==self.mat.dim)
+        if self.dep_dim!=self.mat.dim:
+            self._handle_material_inconsistent_dimension()
         
         ## For the penalty DOFs
         self.penalty_dofs = penalty_dofs
@@ -328,6 +329,9 @@ class FenicsProblem():
         bb = df.assemble(df.inner(_f, self.v_u) * self.dxm)
         _correction = 1. / sum(bb)
         return _correction
+    
+    def _handle_material_inconsistent_dimension(self):
+        raise ValueError(f"Inconsistent dimension of material: mat_dim={self.mat.dim}, dep_dim={self.dep_dim}.")
 
 class FenicsElastic(FenicsProblem):
     def __init__(self, mat, mesh, fen_config, dep_dim=None \

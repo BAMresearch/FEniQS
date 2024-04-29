@@ -16,7 +16,6 @@ class FenicsElasticShell(FenicsProblem):
         assert isinstance(mat, ElasticConstitutive)
         if mat.constraint.lower()!='plane_stress':
             raise NotImplementedError("Elastic shell formulation is only implemented for PLANE_STRESS.")
-        mat.dim = 3 # to avoid incompatibility
         FenicsProblem.__init__(self, mat, mesh, fen_config, dep_dim \
                                , penalty_dofs=penalty_dofs, penalty_weight=penalty_weight)
         self.shF_degree_theta = fen_config.shF_degree_theta
@@ -132,6 +131,10 @@ class FenicsElasticShell(FenicsProblem):
     def reset_fields(self, u0=0.0):
         # u0 can be a vector of the same length as self.u_u
         self.u_mix.vector()[:] = u0
+
+    def _handle_material_inconsistent_dimension(self): # overwritten
+        pass # In this shell-based problem, we have "self.mat.dim=2" and "self.dep_dim=3",
+             # which are not equal. But this is OK.
 
 def local_frame(mesh, dim=None, xdmf_file='./frame.xdmf'):
     if dim is None:
