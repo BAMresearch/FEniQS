@@ -1,4 +1,5 @@
 from feniQS.problem.problem import *
+from feniQS.material.shell_stress_resultant import *
 
 pth_problem_shell = CollectPaths('./feniQS/problem/problem_shell.py')
 pth_problem_shell.add_script(pth_problem)
@@ -11,19 +12,27 @@ class ShellFenConfigDefault:
         self.el_family = 'Lagrange'
 
 class FenicsElasticShell(FenicsProblem):
-    def __init__(self, mat, mesh, thick, fen_config, dep_dim=3 \
-                 , penalty_dofs=[], penalty_weight=df.Constant(0.)):
-        assert isinstance(mat, ElasticConstitutive)
+    _variational_approaches = ['ufl_original', 'c_matrices_ufl', 'c_matrices_numpy']
+    def __init__(self, mat, mesh, fen_config, dep_dim=3 \
+                , penalty_dofs=[], penalty_weight=df.Constant(0.) \
+                , _variational_approach='ufl_original'):
+        assert isinstance(mat, ElasticShellStressResultantConstitutive)
+        if mat.ss_vector.lower()!='voigt':
+            raise NotImplementedError(f"Shell model is implemented only with Voigt notation.")
         if mat.constraint.lower()!='plane_stress':
             raise NotImplementedError("Elastic shell formulation is only implemented for PLANE_STRESS.")
         FenicsProblem.__init__(self, mat, mesh, fen_config, dep_dim \
                                , penalty_dofs=penalty_dofs, penalty_weight=penalty_weight)
         self.shF_degree_theta = fen_config.shF_degree_theta
-        self.thick = thick
+        self.thickness = self.mat.thickness
+        if _variational_approach.lower() not in FenicsElasticShell._variational_approaches:
+            raise ValueError(f"Possible values for _variational_approach are: {FenicsElasticShell._variational_approaches}.")
+        self._variational_approach = _variational_approach.lower() # see self.discretize & self.build_variational_functionals
         
     def build_variational_functionals(self, f=None, integ_degree=None, expr_sigma_scale=1):
         FenicsProblem.build_variational_functionals(self, f, integ_degree) # includes discritization & building external forces
-        ## Internal forces
+        ### Internal forces
+            # Strains
         e1, e2, e3 = local_frame(self.mesh, dim=self.dep_dim, xdmf_file=None)
         P_plane = hstack([e1, e2]) # In-plane projection
         def t_grad(u):
@@ -37,20 +46,45 @@ class FenicsElasticShell(FenicsProblem):
         eps_ = ufl.replace(eps, {self.u_mix: self.v_mix})
         kappa_ = ufl.replace(kappa, {self.u_mix: self.v_mix})
         gamma_ = ufl.replace(gamma, {self.u_mix: self.v_mix})
-        def plane_stress_elasticity(e, lamda, mu):
-            return lamda * df.tr(e) * df.Identity(2) + 2 * mu * e
-        self.N = self.thick * plane_stress_elasticity(eps, self.mat.lamda, self.mat.mu)
-        self.M = self.thick ** 3 / 12 * plane_stress_elasticity(kappa, self.mat.lamda, self.mat.mu)
-        self.Q = self.mat.mu * self.thick * gamma
         drilling_strain = (t_gu[0, 1] - t_gu[1, 0]) / 2 - df.dot(self.u_theta, e3)
         drilling_strain_ = ufl.replace(drilling_strain, {self.u_mix: self.v_mix})
-        self.drilling_stress = self.mat.E * self.thick ** 3 * drilling_strain
+            # Stresses
+        if self._variational_approach.lower()=='ufl_original':
+                # original approach in https://comet-fenics.readthedocs.io/en/latest/demo/linear_shell/linear_shell.html
+            def plane_stress_elasticity(e, lamda, mu):
+                return lamda * df.tr(e) * df.Identity(2) + 2 * mu * e
+            self.N = self.thickness * plane_stress_elasticity(eps, self.mat.lamda, self.mat.mu)
+            self.M = self.thickness ** 3 / 12 * plane_stress_elasticity(kappa, self.mat.lamda, self.mat.mu)
+            self.Q = self.mat.shear_correction_factor * self.mat.mu * self.thickness * gamma
+        elif self._variational_approach.lower()=='c_matrices_ufl':
+                # Using constitutive matrices in Voigt notation, and ufl vectors
+            _N = self.mat.get_C_membrane() \
+                @ df.as_vector([eps[0, 0], eps[1, 1], 2 * eps[0, 1]])
+            self.N = df.as_vector([_N[0], _N[1], _N[2]])
+            eps_ = df.as_vector([eps_[0, 0], eps_[1, 1], 2 * eps_[0, 1]])
+            _M = self.mat.get_C_bending() \
+                @ df.as_vector([kappa[0, 0], kappa[1, 1], 2 * kappa[0, 1]])
+            self.M = df.as_vector([_M[0], _M[1], _M[2]])
+            kappa_ = df.as_vector([kappa_[0, 0], kappa_[1, 1], 2 * kappa_[0, 1]])
+            _Q = self.mat.get_C_shear() @ gamma
+            self.Q = df.as_vector([_Q[0], _Q[1]])
+        elif self._variational_approach.lower()=='c_matrices_numpy':
+                # Using constitutive matrices in Voigt notation, and numpy arrays
+                # This is based on fenics-constitutive approach, which is suitable for an extension to plasticity.
+                raise NotImplementedError('To be implemented ...')
+        else:
+            raise ValueError(f"Unrecognized _variational_approach: '{self._variational_approach}'.")
+
+        self.drilling_stress = self.mat.E * self.thickness ** 3 * drilling_strain
+
+            # Internal forces
         self._F_int = (
             df.inner(self.N, eps_)
             + df.inner(self.M, kappa_)
             + df.dot(self.Q, gamma_)
             + self.drilling_stress * drilling_strain_
         ) * self.dxm
+        
         ## Stiffness matrix
         self._set_K_tangential()
         # self._assemble_K_t()

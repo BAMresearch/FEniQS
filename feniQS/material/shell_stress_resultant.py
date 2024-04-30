@@ -1,5 +1,6 @@
 import numpy as np
 from feniQS.general.general import CollectPaths
+from feniQS.material.fenics_mechanics import *
 
 pth_shell_stress_resultant = CollectPaths('./feniQS/material/shell_stress_resultant.py')
 
@@ -136,3 +137,45 @@ class StressNormIlyushin:
         return [gNx*thickness, gNy*thickness, gNxy*thickness,
                 gMx*t2, gMy*t2, gMxy*t2,
                 gqxz*thickness, gqyz*thickness]
+
+class ElasticShellStressResultantConstitutive():
+    def __init__(self, E, nu, thickness \
+                , constraint='PLANE_STRESS' \
+                , shear_correction_factor=1.):
+        self.E = E
+        self.nu = nu
+        self.thickness = thickness # default (uniform) thickness
+        if constraint!='PLANE_STRESS':
+            raise NotImplementedError(f"Elastic shell stress resultant is only implemented for PLANA_STRESS.")
+        self.constraint = constraint
+        self.shear_correction_factor = shear_correction_factor
+        self.dim = 2
+        self.ss_dim = 3
+        self.ss_vector = 'Voigt'; _fact = 1
+        self.mu, self.lamda = constitutive_coeffs(E=self.E, nu=self.nu, constraint=self.constraint)
+        self.D = (self.E / (1 - self.nu ** 2)) * np.array([ [1, self.nu, 0], [self.nu, 1, 0], [0, 0, _fact * 0.5 * (1-self.nu) ] ])
+
+        self._C_membrane = self.thickness * self.D
+        self._C_bending = (self.thickness ** 3) * self.D / 12.
+        self._C_shear = self.shear_correction_factor * self.thickness * self.mu * np.eye(2)
+    
+    def get_C_membrane(self, thickness=None):
+        thickness = self.thickness if thickness is None else thickness
+        if thickness==self.thickness:
+            return self._C_membrane
+        else:
+            return thickness * self.D
+    
+    def get_C_bending(self, thickness=None):
+        thickness = self.thickness if thickness is None else thickness
+        if thickness==self.thickness:
+            return self._C_bending
+        else:
+            return (self.thickness ** 3) * self.D / 12.
+    
+    def get_C_shear(self, thickness=None):
+        thickness = self.thickness if thickness is None else thickness
+        if thickness==self.thickness:
+            return self._C_shear
+        else:
+            return self.shear_correction_factor * self.thickness * self.mu * np.eye(2)
