@@ -222,15 +222,15 @@ if __name__=='__main__':
     ###################################################################
     struct = MyStructure()
     mat = MyElasticMaterial(E=200e3, nu=0.3)
-    top_load = 0.005; top_load_type = 'u'
-    # top_load = -1000.; top_load_type = 'f'
     
     ###################################################################
-        ### Reference solution (to get admissible stresses)
+        ### Reference problem 'fen0' (as admissible stresses)
     ###################################################################
+    top_load0 = -1000.; top_load_type0 = 'f'
+    # top_load0 = -0.005; top_load_type0 = 'u'
     fen0 = MyElasticProblem(struct=struct, mat=mat)
     loadings0, bcs0_dict, bcs0_Neumann = struct.get_BCs_and_loading(iu=fen0.i_u \
-                        , top_load=top_load, top_load_type=top_load_type)
+                        , top_load=top_load0, top_load_type=top_load_type0)
     bcs0 = [bc['bc'] for bc in bcs0_dict.values()]
     fen0.build_solver(bcs=bcs0, bcs_Neumann=bcs0_Neumann)
     fen0.solve()
@@ -239,26 +239,29 @@ if __name__=='__main__':
     fs_ad = df.assemble(fen0.F_int).get_local()
         # Strain energy
     E0s = compute_strain_energy(fen0, 'Reference (admissible)')
-        # Displacements everywhere except top/bottom edges
+        # Displacements everywhere except bottom edge
     cs = fen0.mesh.coordinates()
     tol = fen0.mesh.rmin()/1000.
-    cs_selected = cs[[tol<y<1.-tol for y in cs[:,1]],:] # Exclude top and bottom edges
+    cs_selected = cs[[tol<y for y in cs[:,1]],:] # Exclude bottom edge
     us_selected = np.array([fen0.u_u(c) for c in cs_selected])
     
     ###################################################################
-        ### New arbitrary problem (e.g. by imposing some noisy Disps.)
+        ### Arbitrary problem 'fen' (e.g. by imposing some biased and noisy Disps.)
     ###################################################################
-    noise_level = 0.1
+    fen = MyElasticProblem(struct=struct, mat=mat)
+        # Build many_bcs for some noisy displacements (except at bottom edge)
+    scale_us = 1.2
+    noise_level = 0.2
     np.random.seed(1983)
     us_noise = np.random.normal(0., noise_level * np.std(us_selected), us_selected.shape)
-    us_selected_noisy = us_selected + us_noise
-    fen = MyElasticProblem(struct=struct, mat=mat)
-    loadings, bcs_dict, bcs_Neumann = struct.get_BCs_and_loading(iu=fen.i_u \
-                        , top_load=top_load, top_load_type=top_load_type)
-    bcs = [bc['bc'] for bc in bcs_dict.values()]
+    us_selected_noisy = scale_us * us_selected + us_noise
     many_bcs = ManyBCs(V=fen.i_u, v_bc=fen.i_u, points=cs_selected \
                        , sub_ids=[], vals=us_selected_noisy)
-    fen.build_solver(bcs=bcs + [many_bcs.bc], bcs_Neumann=bcs_Neumann)
+        # We also need only fixed Dirichlet BCs at bottom edge
+    bcs_fixed_dict = struct.get_BCs_fixed_bottom(iu=fen.i_u)
+    bcs_fixed = [bc['bc'] for bc in bcs_fixed_dict.values()]
+        # Solve
+    fen.build_solver(bcs=bcs_fixed + [many_bcs.bc], bcs_Neumann=dict())
     fen.solve()
         # Strain energy
     Es = compute_strain_energy(fen, 'By imposing disps.')
@@ -267,7 +270,7 @@ if __name__=='__main__':
     eps = copy.deepcopy(fen.eps.vector().get_local())
 
     ###################################################################
-        ### CEG error (a strain energy norm) computed from:
+        ### CEG error (of strain energy norm) computed from:
             # d_sigma_CEG        = sig - sig_ad
             # eps_of_d_sigma_CEG = (C^-1).d_sigma_CEG
         # where both 'sig' and 'C' are from the 'fen' problem above.
@@ -299,25 +302,28 @@ if __name__=='__main__':
             # constitutive matrix being the same as used for CEG error.
         ### Compute the strain energy of FFF problem.
     ###################################################################
+    fen_fff = MyElasticProblem(struct=struct, mat=mat) # Has no BCs
         # Build the FEMU-F error (gap btw. admissible and internal forces)
     fs_femu_f = fs_ad - f_int
-    fen_fff = MyElasticProblem(struct=struct, mat=mat) # Has no BCs
-        # We only need fixed Dirichlet BCs (at bottom)
-    bcs_fixed_dict = struct.get_BCs_fixed_bottom(iu=fen_fff.i_u)
-    bcs_fixed = [bc['bc'] for bc in bcs_fixed_dict.values()]
         # FEMU-F forces should be applied at everywhere except fixed BCs (otherwise the solution would diverge)
     dofs_bot = bcs_fixed_dict['bot_x']['dofs'] \
              + bcs_fixed_dict['bot_y']['dofs']
     dofs_except_bot = [i for i in range(fen_fff.i_u.dim()) if i not in dofs_bot]
+    plt.figure(); plt.plot(fs_femu_f[dofs_except_bot])
+    plt.title(f"FEMU-F error forces (except at fixed BCs)"); plt.show()
         # Set nodal external forces (everywhere except fixed BCs)
     fen_fff.nodal_external_forces.vector()[dofs_except_bot] = fs_femu_f[dofs_except_bot]
+        # We also need only fixed Dirichlet BCs at bottom edge
+    bcs_fixed_dict = struct.get_BCs_fixed_bottom(iu=fen_fff.i_u)
+    bcs_fixed = [bc['bc'] for bc in bcs_fixed_dict.values()]
+        # Solve
     fen_fff.build_solver(bcs=bcs_fixed, bcs_Neumann=dict())
     fen_fff.solve()
         # Strain energy
     Efffs = compute_strain_energy(fen_fff, 'FEMU-F error as nodal forces')
     
     ###################################################################
-        ### Comparisons
+        ### Comparisons & Plots
     ###################################################################
         # Compare E_CEG and Efffs
     err_r = abs((Efffs[0] - E_CEG) / E_CEG)
@@ -330,8 +336,11 @@ if __name__=='__main__':
         # Investigate balance of energy
     energy_balance = Es[0] - (E0s[0] + Efffs[0])
     _msg = f"\033[33mEnergy balance\033[0m = E - E_admissible - E_FFF =\n\t\033[31m{energy_balance:.2e}\033[0m."
-    _msg += f"\n\tThis can be nonzero; e.g. if the admissible and FFF problems have different displacement-responses at Neumann BCs!"
+    _msg += f"\n\tThis can be nonzero; e.g. if the admissible and FFF problems have different displacement-responses and/or Neumann BCs!"
     print(_msg)
+    plt.figure(); df.plot(fen0.u_u); plt.title(f"U (reference (admissible) problem)"); plt.show()
+    plt.figure(); df.plot(fen.u_u); plt.title(f"U (arbitrary problem)"); plt.show()
+    plt.figure(); df.plot(fen_fff.u_u); plt.title(f"U (FFF problem)"); plt.show()
 
 
     df.set_log_level(20)
