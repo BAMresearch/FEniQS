@@ -167,6 +167,10 @@ class MyElasticProblem(df.NonlinearProblem):
         else:
             print(f"    The time step t={t} did not converge.")
         return (_it, conv)
+    
+    def compute_strain_energy(self):
+        strain_energy_density = 0.5 * df.inner(self.sig, self.eps) * self.dxm
+        return df.assemble(strain_energy_density)
 
 def get_my_nonlinear_solver_options():
     return {
@@ -188,18 +192,17 @@ def get_my_solver(nln_so):
 def compute_strain_energy(fen, _info=''):
     K_t = df.assemble(fen.K_t).array()
     u_vec = fen.u_u.vector().get_local()
-    # K_times_u = K_t @ u_vec
     E1 = 0.5 * np.einsum('m,mn,n->', u_vec, K_t, u_vec)
 
     f_int = df.assemble(fen.F_int).get_local()
     E2 = 0.5 * np.einsum('n,n->', u_vec, f_int)
 
-    strain_energy_density = 0.5 * df.inner(fen.sig, fen.eps) * fen.dxm
-    E3 = df.assemble(strain_energy_density)
+    E3 = fen.compute_strain_energy()
 
-    _info_len = 0 if _info=='' else (len(_info) + 3)
-    _end = max((34 - _info_len), 0) * '-'
-    _msg = f"\033[33mStrain Energy ({_info})\033[0m {_end}"
+    if _info!='':
+        _info = f" ({_info})"
+    _end = max((34 - len(_info)), 0) * '-'
+    _msg = f"\033[33mStrain Energy{_info}\033[0m {_end}"
     _msg += f"\n\t1) (U^T).K.U               = \033[32m{E1:.5e}\033[0m"
     _msg += f"\n\t2) (U^T).F_int             = \033[32m{E2:.5e}\033[0m"
     _msg += f"\n\t3) Integral(Stress:Strain) = \033[32m{E3:.5e}\033[0m"
@@ -284,8 +287,7 @@ if __name__=='__main__':
     plt.plot(fen.eps.vector(), label='Epsilon = (C^-1).d_sigma_CEG (used for CEG error)')
     plt.legend()
     plt.show()
-    strain_energy_density = 0.5 * df.inner(fen.sig, fen.eps) * fen.dxm
-    E_CEG = df.assemble(strain_energy_density)
+    E_CEG = fen.compute_strain_energy()
     print(f"\n\033[33mStrain energy (CEG)\033[0m\n\tIntegral(Stress:Strain) = \033[32m{E_CEG:.5e}\033[0m")
         # Reset fen.sig and fen.eps from their back-up values
     fen.sig.vector()[:] = sig[:]
