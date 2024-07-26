@@ -3,6 +3,7 @@ from feniQS.general.general import CollectPaths
 from feniQS.material.fenics_mechanics import *
 
 pth_shell_stress_resultant = CollectPaths('./feniQS/material/shell_stress_resultant.py')
+pth_shell_stress_resultant.add_script(pth_fenics_mechanics)
 
 class StressNormIlyushin:
     A = np.array([[1., -0.5, 0.], [-0.5, 1., 0.], [0., 0., 3.]])
@@ -45,28 +46,54 @@ class StressNormIlyushin:
             Eq.(64) (for alpha=0.25) in:
                 https://onlinelibrary.wiley.com/doi/10.1002/(SICI)1097-0207(19991230)46:12%3C1961::AID-NME759%3E3.0.CO;2-E
         """
+        if np.isscalar(Nx):
+            Nx = np.array([Nx])
+        if np.isscalar(Ny):
+            Ny = np.array([Ny])
+        if np.isscalar(Nxy):
+            Nxy = np.array([Nxy])
+        if np.isscalar(Mx):
+            Mx = np.array([Mx])
+        if np.isscalar(My):
+            My = np.array([My])
+        if np.isscalar(Mxy):
+            Mxy = np.array([Mxy])
+        if np.isscalar(qxz):
+            qxz = np.array([qxz])
+        if np.isscalar(qyz):
+            qyz = np.array([qyz])
+        assert isinstance(Nx, np.ndarray)
+        _size = len(Nx)
+        assert all([len(a)==_size for a in [Ny, Nxy, Mx, My, Mxy, qxz, qyz]])
+        
         if thickness is None:
             thickness = self.thickness
+        
         ## (1)
         s_eq = (Nx**2 + Ny**2 - Nx*Ny + 3.*(Nxy**2)) / (thickness**2)
         s_eq += (Mx**2 + My**2 - Mx*My + 3.*(Mxy**2)) / (self.alpha**2) / (thickness**4)
         s_eq += 3. * (qxz**2 + qyz**2) / (thickness**2)
         if self.coupling:
             P = Nx*Mx + Ny*My - 0.5*Nx*My - 0.5*Ny*Mx + 3.*Nxy*Mxy
-            s = 1 if P==0. else np.sign(P)
+            s = np.where(P == 0., 1, np.sign(P))
             s_eq += s * P / (np.sqrt(3.) * self.alpha * (thickness**3))
         else:
             s = None # irrelevant
+        
         # (2) Using "_Ay_s" matrix (by y0=1.)
         if thickness==self.thickness and self.y0==1.0:
-            _Ay_s = self._Ay_1 if s==1 else self._Ay_2
+            _Ay_s = np.array([self._Ay_1 if si==1 else self._Ay_2 for si in s])
         else:
             _n0, _m0, _q0 = StressNormIlyushin.yield_stress_resultants(y0=1., thickness=thickness)
-            _Ay_s = StressNormIlyushin.yield_matrix(s=s, _n0=_n0, _m0=_m0, _q0=_q0, coupling=self.coupling)
-        s_vector = np.array([Nx, Ny, Nxy, Mx, My, Mxy, qxz, qyz]).reshape((-1,1))
-        s_eq_2 = s_vector.T @ _Ay_s @ s_vector
-        assert abs(s_eq - s_eq_2) / max(1., abs(s_eq)) < 1e-12
-        return np.sqrt(s_eq)
+            _Ay_s = np.array([StressNormIlyushin.yield_matrix(s=si, _n0=_n0, _m0=_m0, _q0=_q0, coupling=self.coupling) for si in s])
+        s_vector = np.array([Nx, Ny, Nxy, Mx, My, Mxy, qxz, qyz])
+        s_eq_2 = np.einsum('mi,imn,ni->i', s_vector, _Ay_s, s_vector)
+        assert np.linalg.norm(s_eq - s_eq_2) / max(1., np.linalg.norm(s_eq)) < 1e-12
+
+        if _size==1:
+            return np.sqrt(s_eq)[0]
+        else:
+            return np.sqrt(s_eq)
 
     def eq_stresses_double(self, Nx, Ny, Nxy, Mx, My, Mxy, qxz=0., qyz=0. \
                          , thickness=None):
@@ -85,8 +112,29 @@ class StressNormIlyushin:
             Eq.(6) (for alpha=0.25) in:
                 https://www.sciencedirect.com/science/article/pii/S0263823116300118
         """
+        if np.isscalar(Nx):
+            Nx = np.array([Nx])
+        if np.isscalar(Ny):
+            Ny = np.array([Ny])
+        if np.isscalar(Nxy):
+            Nxy = np.array([Nxy])
+        if np.isscalar(Mx):
+            Mx = np.array([Mx])
+        if np.isscalar(My):
+            My = np.array([My])
+        if np.isscalar(Mxy):
+            Mxy = np.array([Mxy])
+        if np.isscalar(qxz):
+            qxz = np.array([qxz])
+        if np.isscalar(qyz):
+            qyz = np.array([qyz])
+        assert isinstance(Nx, np.ndarray)
+        _size = len(Nx)
+        assert all([len(a)==_size for a in [Ny, Nxy, Mx, My, Mxy, qxz, qyz]])
+
         if thickness is None:
             thickness = self.thickness
+        
         if thickness==self.thickness and self.y0==1.0:
             _Ay_1 = self._Ay_1
             _Ay_2 = self._Ay_2
@@ -94,10 +142,14 @@ class StressNormIlyushin:
             _n0, _m0, _q0 = StressNormIlyushin.yield_stress_resultants(y0=1., thickness=thickness)
             _Ay_1 = StressNormIlyushin.yield_matrix(s=1, _n0=_n0, _m0=_m0, _q0=_q0, coupling=self.coupling)
             _Ay_2 = StressNormIlyushin.yield_matrix(s=-1, _n0=_n0, _m0=_m0, _q0=_q0, coupling=self.coupling)
-        s_vector = np.array([Nx, Ny, Nxy, Mx, My, Mxy, qxz, qyz]).reshape((-1,1))
-        s_eq_1 = (s_vector.T @ _Ay_1 @ s_vector)[0,0]
-        s_eq_2 = (s_vector.T @ _Ay_2 @ s_vector)[0,0]
-        return np.sqrt(s_eq_1), np.sqrt(s_eq_2)
+        s_vector = np.array([Nx, Ny, Nxy, Mx, My, Mxy, qxz, qyz])
+        s_eq_1 = np.einsum('mi,mn,ni->i', s_vector, _Ay_1, s_vector)
+        s_eq_2 = np.einsum('mi,mn,ni->i', s_vector, _Ay_2, s_vector)
+        
+        if _size==1:
+            return np.sqrt(s_eq_1)[0], np.sqrt(s_eq_2)[0]
+        else:
+            return np.sqrt(s_eq_1), np.sqrt(s_eq_2)
     
     @staticmethod
     def yield_stress_resultants(y0, thickness):
