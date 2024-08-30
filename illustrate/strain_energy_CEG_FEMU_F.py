@@ -1,9 +1,9 @@
 from feniQS.fenics_helpers.fenics_functions import *
 
 class MyStructure:
-    def __init__(self):
+    def __init__(self, resolution=3):
         self.lx = self.ly = 1.
-        self.mesh = df.UnitSquareMesh(10, 10)
+        self.mesh = df.UnitSquareMesh(resolution, resolution)
     
     def get_BCs_fixed_bottom(self, iu):
         bcs_fixed = {}
@@ -67,10 +67,6 @@ class MyElasticMaterial():
         self.mu = self.E / (2 * (1 + self.nu))
         if self.constraint=='PLANE_STRESS':
             self.lamda = 2 * self.mu * self.lamda / (self.lamda + 2 * self.mu)
-        
-    # def sigma(self, u):
-    #     eps_u = df.sym(df.grad(u))
-    #     return self.lamda * df.tr(eps_u) * df.Identity(2) + 2 * self.mu * eps_u
 
 def my_eps_vector(u):
     e = df.sym(df.grad(u))
@@ -78,13 +74,14 @@ def my_eps_vector(u):
     return df.as_vector([e[0, 0], e[1, 1], _fact * e[0, 1]])
 
 class MyElasticProblem(df.NonlinearProblem):
-    def __init__(self, struct, mat):
+    def __init__(self, struct, mat, damage_level=0.):
         df.NonlinearProblem.__init__(self)
         self.struct = struct
         self.mesh = self.struct.mesh
         self.mat = mat
         self.shF_degree_u = 2
         self.integ_degree = 2
+        self.damage_level = damage_level
 
         md = {'quadrature_degree': self.integ_degree,
               'quadrature_scheme': 'default'}
@@ -127,7 +124,13 @@ class MyElasticProblem(df.NonlinearProblem):
         
         # Define and initiate tangent operator (elasto-plastic stiffness matrix)
         self.Ct = df.Function(i_tensor, name="Tangent operator")
-        Ct_num = np.tile(self.mat.D.flatten(), self.ngauss).reshape((self.ngauss, self.mat.ss_dim**2)) # set the elastic stiffness at all Gauss-points
+        if self.damage_level==0.:
+            self.damages = np.zeros(self.ngauss)
+        else:
+            np.random.seed(1983)
+            damages = abs(np.random.normal(0., self.damage_level, (self.ngauss,))) # strictly positive
+            self.damages = np.array([min(0.99, d) for d in damages]) # Upper bound = 0.99
+        Ct_num = np.concatenate([(1. - d) * self.mat.D.flatten() for d in self.damages]) # set the tangent matrix at all Gauss-points
         self.Ct.vector().set_local(Ct_num.flatten()) # assign the helper "Ct_num" to "Ct"
 
         self.K_t = df.inner(my_eps_vector(self.v), df.dot(self.Ct, my_eps_vector(self.v_u))) * self.dxm
@@ -164,6 +167,10 @@ class MyElasticProblem(df.NonlinearProblem):
         _it, conv = self.solver.solve(self, u.vector())
         if conv:
             print(f"    The time step t={t} converged after {_it} iteration(s).")
+            self.projector_eps(self.eps)
+            Cts = self.Ct.vector().get_local().reshape((-1, self.mat.ss_dim, self.mat.ss_dim))
+            strains = self.eps.vector().get_local().reshape((-1, self.mat.ss_dim))
+            self.sig.vector()[:] = np.einsum('mij,mj->mi', Cts, strains).flatten()
         else:
             print(f"    The time step t={t} did not converge.")
         return (_it, conv)
@@ -228,7 +235,7 @@ if __name__=='__main__':
     ###################################################################
     top_load0 = -1000.; top_load_type0 = 'f'
     # top_load0 = -0.005; top_load_type0 = 'u'
-    fen0 = MyElasticProblem(struct=struct, mat=mat)
+    fen0 = MyElasticProblem(struct=struct, mat=mat, damage_level=0.3)
     loadings0, bcs0_dict, bcs0_Neumann = struct.get_BCs_and_loading(iu=fen0.i_u \
                         , top_load=top_load0, top_load_type=top_load_type0)
     bcs0 = [bc['bc'] for bc in bcs0_dict.values()]
@@ -237,6 +244,8 @@ if __name__=='__main__':
         # Admissible stresses and forces (in equilibrium with external forces)
     sig_ad = copy.deepcopy(fen0.sig.vector().get_local())
     fs_ad = df.assemble(fen0.F_int).get_local()
+    plt.figure(); plt.plot(sig_ad); plt.title(f"Admissible stresses"); plt.show()
+    plt.figure(); plt.plot(fs_ad); plt.title(f"Admissible internal forces"); plt.show()
         # Strain energy
     E0s = compute_strain_energy(fen0, 'Reference (admissible)')
         # Displacements everywhere except bottom edge
@@ -275,26 +284,24 @@ if __name__=='__main__':
             # eps_of_d_sigma_CEG = (C^-1).d_sigma_CEG
         # where both 'sig' and 'C' are from the 'fen' problem above.
     ###################################################################
+    fen_CEG = MyElasticProblem(struct=struct, mat=mat)
     d_sigma_CEG = sig - sig_ad
-        # We use the mesh/problem of 'fen' to compute err_CEG (we have already back-up of fen.sig and fen.eps)
-    fen.sig.vector()[:] = d_sigma_CEG[:]
+    fen_CEG.sig.vector()[:] = d_sigma_CEG[:]
     eps_of_d_sigma_CEG = np.zeros_like(eps)
     C_matrices = fen.Ct.vector().get_local().reshape((fen.i_q.dim(),3,3))
     for i, C in enumerate(C_matrices):
         C_inv = np.linalg.inv(C)
         eps_of_d_sigma_CEG_i = C_inv @ d_sigma_CEG[i*3:(i+1)*3]
         eps_of_d_sigma_CEG[i*3:(i+1)*3] = eps_of_d_sigma_CEG_i[:]
-    fen.eps.vector()[:] = eps_of_d_sigma_CEG
+    fen_CEG.eps.vector()[:] = eps_of_d_sigma_CEG
     plt.figure()
     plt.plot(eps, label='Epsilon computed after imposing disps.')
-    plt.plot(fen.eps.vector(), label='Epsilon = (C^-1).d_sigma_CEG (used for CEG error)')
+    plt.plot(fen_CEG.eps.vector(), label='Epsilon = (C^-1).d_sigma_CEG (used for CEG error)')
     plt.legend()
     plt.show()
-    E_CEG = fen.compute_strain_energy()
+    E_CEG = fen_CEG.compute_strain_energy()
     print(f"\n\033[33mStrain energy (CEG)\033[0m\n\tIntegral(Stress:Strain) = \033[32m{E_CEG:.5e}\033[0m")
-        # Reset fen.sig and fen.eps from their back-up values
-    fen.sig.vector()[:] = sig[:]
-    fen.eps.vector()[:] = eps[:]
+    f_int_CEG = df.assemble(df.inner(my_eps_vector(fen_CEG.v_u), fen_CEG.sig) * fen_CEG.dxm).get_local()
 
     ###################################################################
         ### Build/solve the FFF problem; a problem with:
@@ -304,7 +311,7 @@ if __name__=='__main__':
     ###################################################################
     fen_fff = MyElasticProblem(struct=struct, mat=mat) # Has no BCs
         # Build the FEMU-F error (gap btw. admissible and internal forces)
-    fs_femu_f = fs_ad - f_int
+    fs_femu_f = f_int - fs_ad
         # FEMU-F forces should be applied at everywhere except fixed BCs (otherwise the solution would diverge)
     dofs_bot = bcs_fixed_dict['bot_x']['dofs'] \
              + bcs_fixed_dict['bot_y']['dofs']
@@ -312,13 +319,17 @@ if __name__=='__main__':
     plt.figure(); plt.plot(fs_femu_f[dofs_except_bot])
     plt.title(f"FEMU-F error forces (except at fixed BCs)"); plt.show()
         # Set nodal external forces (everywhere except fixed BCs)
-    fen_fff.nodal_external_forces.vector()[dofs_except_bot] = fs_femu_f[dofs_except_bot]
+    fen_fff.nodal_external_forces.vector()[dofs_except_bot] = - fs_femu_f[dofs_except_bot]
         # We also need only fixed Dirichlet BCs at bottom edge
     bcs_fixed_dict = struct.get_BCs_fixed_bottom(iu=fen_fff.i_u)
     bcs_fixed = [bc['bc'] for bc in bcs_fixed_dict.values()]
         # Solve
     fen_fff.build_solver(bcs=bcs_fixed, bcs_Neumann=dict())
     fen_fff.solve()
+        # Check if internal forces are equal to fs_femu_f (with latter being minus of external forces)
+    f_int_fff = df.assemble(fen_fff.F_int).get_local()
+    err_fs = fs_femu_f - f_int_fff
+    assert np.linalg.norm(err_fs[dofs_except_bot]) / np.linalg.norm(f_int_fff) < 1e-12
         # Strain energy
     Efffs = compute_strain_energy(fen_fff, 'FEMU-F error as nodal forces')
     
@@ -328,19 +339,21 @@ if __name__=='__main__':
         # Compare E_CEG and Efffs
     err_r = abs((Efffs[0] - E_CEG) / E_CEG)
     print(f"\033[33mRelative error btw. CEG error and FFF energy\n\t\033[31m{err_r:.1e}\033[0m.")
-        # Compare stresses and strains of CEG and FFF
+        # Compare froces, stresses and strains of CEG and FFF
+    err_fs =  fs_femu_f - f_int_CEG
     err_sig = fen_fff.sig.vector().get_local() - d_sigma_CEG
     err_eps = fen_fff.eps.vector().get_local() - eps_of_d_sigma_CEG
+    plt.figure(); plt.plot(err_fs); plt.title('Error of int. Forces btw. CEG and FFF'); plt.show()
     plt.figure(); plt.plot(err_sig); plt.title('Error of Stress btw. CEG and FFF'); plt.show()
     plt.figure(); plt.plot(err_eps); plt.title('Error of Strain btw. CEG and FFF'); plt.show()
         # Investigate balance of energy
     energy_balance = Es[0] - (E0s[0] + Efffs[0])
-    _msg = f"\033[33mEnergy balance\033[0m = E - E_admissible - E_FFF =\n\t\033[31m{energy_balance:.2e}\033[0m."
+    _msg = f"\033[33mEnergy balance\033[0m = E_reference - E_admissible - E_FFF =\n\t\033[31m{energy_balance:.2e}\033[0m."
     _msg += f"\n\tThis can be nonzero; e.g. if the admissible and FFF problems have different displacement-responses and/or Neumann BCs!"
     print(_msg)
-    plt.figure(); df.plot(fen0.u_u); plt.title(f"U (reference (admissible) problem)"); plt.show()
-    plt.figure(); df.plot(fen.u_u); plt.title(f"U (arbitrary problem)"); plt.show()
-    plt.figure(); df.plot(fen_fff.u_u); plt.title(f"U (FFF problem)"); plt.show()
-
+    plt.figure(); df.plot(fen0.mesh); df.plot(fen0.u_u); plt.title(f"U (reference (admissible) problem)"); plt.show()
+    plt.figure(); df.plot(fen.mesh); df.plot(fen.u_u); plt.title(f"U (arbitrary problem)"); plt.show()
+    plt.figure(); df.plot(fen_fff.mesh); df.plot(fen_fff.u_u); plt.title(f"U (FFF problem)"); plt.show()
 
     df.set_log_level(20)
+    print("\n----- DONE! -----")
