@@ -25,6 +25,7 @@ def visualize_projected_stress(q_ss, mesh, DG_degree):
         plt.show()
 
 if __name__=='__main__':
+    np.random.seed(1983)
     shF_degree = 2 # Concerning virtual displacement
     integ_degree = 2 # Regarding Quadrature space that stores stresses
     ss_dim = 3 # For: sigma_xx, sigma_yy, sigma_xy
@@ -41,8 +42,6 @@ if __name__=='__main__':
     plt.show()
 
     ### ARBITRARY STRESSes at GAUSS-POINTs ###
-    import random
-    random.seed(1983)
     assert ss_dim==3
     elem_ss = df.VectorElement(family='Quadrature', cell=mesh.ufl_cell()\
                             , degree=integ_degree, dim=ss_dim, quad_scheme="default")
@@ -95,8 +94,8 @@ if __name__=='__main__':
     plt.xlabel("DOF")
     plt.ylabel("Internal force")
     plt.show()
-    err_r = np.linalg.norm(f_int_assembled - f_int_assembled_2) / np.linalg.norm(f_int_assembled)
-    print(f"Relative norm-2-error in computed internal forces:\n\t{err_r:.2e}")
-    assert (err_r < 1e-12)
+    err_r_f = np.linalg.norm(f_int_assembled - f_int_assembled_2) / np.linalg.norm(f_int_assembled)
+    print(f"Relative norm-2-error in computed internal forces:\n\t{err_r_f:.2e}")
+    assert (err_r_f < 1e-12)
 
-    print("\n----- DONE! -----")
+    print("\n----- DONE! -----") 
