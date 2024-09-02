@@ -73,8 +73,9 @@ class QSModelElastic(QuasiStaticModel):
         for pp in self.pps_default.values():
             self.pps.append(pp)
     
-    def solve(self, solve_options, other_pps=[], _reset_pps=True):
-        ts, iterations, solve_options = QuasiStaticModel.solve(self, solve_options, other_pps, _reset_pps)
+    def solve(self, solve_options, other_pps=[], _reset_pps=True, write_pars=True):
+        ts, iterations, solve_options = QuasiStaticModel.solve(self, solve_options=solve_options \
+                                        , other_pps=other_pps, _reset_pps=_reset_pps, write_pars=write_pars)
         return ts, iterations
     
     def _commit_struct_to_model(self):
