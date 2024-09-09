@@ -11,7 +11,11 @@ class StressNormIlyushin:
         """
         This class concerns the so-called "Ilyushin" norm of stress resultant components
         , which is relevant for the perfect plasticity.
-        If coupling==True, the coupling between membrane and bending is considered, otherwise not.
+        If coupling==True, the coupling between membrane and bending is considered.
+        If coupling==False, we have the simplified Ilyshuin (s=0).
+        The method "self.eq_stress_single" always computes the "un-coupled" case (s=0)
+            , and if self.coupling==True it additionally computes the equivalent stress
+            with coupling terms.
         """
         self.alpha = alpha
         self.y0 = y0 # uniaxial yield stress
@@ -19,13 +23,32 @@ class StressNormIlyushin:
         self.coupling = coupling
         self._n0, self._m0, self._q0 = StressNormIlyushin.yield_stress_resultants(
             y0=self.y0, thickness=self.thickness)
-        self._Ay_1 = StressNormIlyushin.yield_matrix(s=1. \
-                    , _n0=self._n0, _m0=self._m0, _q0=self._q0 \
-                    , coupling=self.coupling)
-        self._Ay_2 = StressNormIlyushin.yield_matrix(s=-1. \
-                    , _n0=self._n0, _m0=self._m0, _q0=self._q0 \
-                    , coupling=self.coupling)
+        self._Ay_0 = StressNormIlyushin.yield_matrix(s=0. \
+                    , _n0=self._n0, _m0=self._m0, _q0=self._q0) # corresponds to "NO coupling"
+        if self.coupling:
+            self._Ay_1 = StressNormIlyushin.yield_matrix(s=1. \
+                        , _n0=self._n0, _m0=self._m0, _q0=self._q0)
+            self._Ay_2 = StressNormIlyushin.yield_matrix(s=-1. \
+                        , _n0=self._n0, _m0=self._m0, _q0=self._q0)
 
+    def eq_equivalent_N(self, Nx, Ny, Nxy, normalize=True, thickness=None):
+        if thickness is None:
+            thickness = self.thickness
+        N_eq = np.sqrt(Nx**2 + Ny**2 - Nx*Ny + 3.*(Nxy**2))
+        if normalize: # Although self.y0 is by default 1, it still makes sense to normalize N_eq (to account for the effect of thickness).
+            return N_eq / self._n0
+        else:
+            return N_eq
+    
+    def eq_equivalent_M(self, Mx, My, Mxy, normalize=True, thickness=None):
+        if thickness is None:
+            thickness = self.thickness
+        M_eq = np.sqrt(Mx**2 + My**2 - Mx*My + 3.*(Mxy**2))
+        if normalize: # Although self.y0 is by default 1, it still makes sense to normalize M_eq (to account for the effect of thickness).
+            return M_eq / self._m0
+        else:
+            return M_eq
+    
     def eq_stress_single(self, Nx, Ny, Nxy, Mx, My, Mxy, qxz=0., qyz=0. \
                          , thickness=None):
         """
@@ -70,30 +93,42 @@ class StressNormIlyushin:
             thickness = self.thickness
         
         ## (1)
-        s_eq = (Nx**2 + Ny**2 - Nx*Ny + 3.*(Nxy**2)) / (thickness**2)
-        s_eq += (Mx**2 + My**2 - Mx*My + 3.*(Mxy**2)) / (self.alpha**2) / (thickness**4)
-        s_eq += 3. * (qxz**2 + qyz**2) / (thickness**2)
+        s_eq0 = (Nx**2 + Ny**2 - Nx*Ny + 3.*(Nxy**2)) / (thickness**2)
+        s_eq0 += (Mx**2 + My**2 - Mx*My + 3.*(Mxy**2)) / (self.alpha**2) / (thickness**4)
+        s_eq0 += 3. * (qxz**2 + qyz**2) / (thickness**2)
         if self.coupling:
             P = Nx*Mx + Ny*My - 0.5*Nx*My - 0.5*Ny*Mx + 3.*Nxy*Mxy
             s = np.where(P == 0., 1, np.sign(P))
-            s_eq += s * P / (np.sqrt(3.) * self.alpha * (thickness**3))
+            s_eq = s_eq0 + s * P / (np.sqrt(3.) * self.alpha * (thickness**3))
         else:
-            s = None # irrelevant
+            s_eq = s_eq0
         
         # (2) Using "_Ay_s" matrix (by y0=1.)
+        s_vector = np.array([Nx, Ny, Nxy, Mx, My, Mxy, qxz, qyz])
+            # With no coupling (s=0) is computed by default.
         if thickness==self.thickness and self.y0==1.0:
-            _Ay_s = np.array([self._Ay_1 if si==1 else self._Ay_2 for si in s])
+            _Ay_0 = self._Ay_0
         else:
             _n0, _m0, _q0 = StressNormIlyushin.yield_stress_resultants(y0=1., thickness=thickness)
-            _Ay_s = np.array([StressNormIlyushin.yield_matrix(s=si, _n0=_n0, _m0=_m0, _q0=_q0, coupling=self.coupling) for si in s])
-        s_vector = np.array([Nx, Ny, Nxy, Mx, My, Mxy, qxz, qyz])
-        s_eq_2 = np.einsum('mi,imn,ni->i', s_vector, _Ay_s, s_vector)
+            _Ay_0 = StressNormIlyushin.yield_matrix(s=0, _n0=_n0, _m0=_m0, _q0=_q0)
+        s_eq0_2 = np.einsum('mi,mn,ni->i', s_vector, _Ay_0, s_vector)
+        if self.coupling:
+            if thickness==self.thickness and self.y0==1.0:
+                _Ay_s = np.array([self._Ay_1 if si==1 else self._Ay_2 for si in s])
+            else:
+                _n0, _m0, _q0 = StressNormIlyushin.yield_stress_resultants(y0=1., thickness=thickness)
+                _Ay_s = np.array([StressNormIlyushin.yield_matrix(s=si, _n0=_n0, _m0=_m0, _q0=_q0) for si in s])
+            s_eq_2 = np.einsum('mi,imn,ni->i', s_vector, _Ay_s, s_vector)
+        else:
+            s_eq_2 = s_eq0_2
+
+        assert np.linalg.norm(s_eq0 - s_eq0_2) / max(1., np.linalg.norm(s_eq0)) < 1e-12
         assert np.linalg.norm(s_eq - s_eq_2) / max(1., np.linalg.norm(s_eq)) < 1e-12
 
         if _size==1:
-            return np.sqrt(s_eq)[0]
+            return np.sqrt(s_eq0)[0], np.sqrt(s_eq)[0]
         else:
-            return np.sqrt(s_eq)
+            return np.sqrt(s_eq0), np.sqrt(s_eq)
 
     def eq_stresses_double(self, Nx, Ny, Nxy, Mx, My, Mxy, qxz=0., qyz=0. \
                          , thickness=None):
@@ -135,16 +170,24 @@ class StressNormIlyushin:
         if thickness is None:
             thickness = self.thickness
         
-        if thickness==self.thickness and self.y0==1.0:
-            _Ay_1 = self._Ay_1
-            _Ay_2 = self._Ay_2
-        else:
-            _n0, _m0, _q0 = StressNormIlyushin.yield_stress_resultants(y0=1., thickness=thickness)
-            _Ay_1 = StressNormIlyushin.yield_matrix(s=1, _n0=_n0, _m0=_m0, _q0=_q0, coupling=self.coupling)
-            _Ay_2 = StressNormIlyushin.yield_matrix(s=-1, _n0=_n0, _m0=_m0, _q0=_q0, coupling=self.coupling)
         s_vector = np.array([Nx, Ny, Nxy, Mx, My, Mxy, qxz, qyz])
-        s_eq_1 = np.einsum('mi,mn,ni->i', s_vector, _Ay_1, s_vector)
-        s_eq_2 = np.einsum('mi,mn,ni->i', s_vector, _Ay_2, s_vector)
+        if self.coupling:
+            if thickness==self.thickness and self.y0==1.0:
+                _Ay_1 = self._Ay_1
+                _Ay_2 = self._Ay_2
+            else:
+                _n0, _m0, _q0 = StressNormIlyushin.yield_stress_resultants(y0=1., thickness=thickness)
+                _Ay_1 = StressNormIlyushin.yield_matrix(s=1, _n0=_n0, _m0=_m0, _q0=_q0)
+                _Ay_2 = StressNormIlyushin.yield_matrix(s=-1, _n0=_n0, _m0=_m0, _q0=_q0)
+            s_eq_1 = np.einsum('mi,mn,ni->i', s_vector, _Ay_1, s_vector)
+            s_eq_2 = np.einsum('mi,mn,ni->i', s_vector, _Ay_2, s_vector)
+        else: # s=0
+            if thickness==self.thickness and self.y0==1.0:
+                _Ay_0 = self._Ay_0
+            else:
+                _n0, _m0, _q0 = StressNormIlyushin.yield_stress_resultants(y0=1., thickness=thickness)
+                _Ay_0 = StressNormIlyushin.yield_matrix(s=0, _n0=_n0, _m0=_m0, _q0=_q0)
+            s_eq_1 = s_eq_2 = np.einsum('mi,mn,ni->i', s_vector, _Ay_0, s_vector)
         
         if _size==1:
             return np.sqrt(s_eq_1)[0], np.sqrt(s_eq_2)[0]
@@ -159,12 +202,9 @@ class StressNormIlyushin:
         return _n0, _m0, _q0
     
     @staticmethod
-    def yield_matrix(s, _n0, _m0, _q0=None, coupling=True):
-        if coupling:
-            assert (s==1. or s==-1.)
-            b12 = s / (2.*np.sqrt(3.)*_n0*_m0)
-        else:
-            b12 = 0.
+    def yield_matrix(s, _n0, _m0, _q0=None):
+        assert (s==1. or s==-1. or s==0.) # The case "s=0" corresponds to NO coupling.
+        b12 = s / (2.*np.sqrt(3.)*_n0*_m0)
         B = np.array([[_n0**(-2), b12],
                       [b12, _m0**(-2)]])
         Ay = np.kron(B, StressNormIlyushin.A)

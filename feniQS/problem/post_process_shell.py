@@ -16,7 +16,7 @@ class PostProcessShell(PostProcess):
             self._form_compiler_parameters = {"quadrature_degree":self.integ_degree,
                                               "quad_scheme":"default",
                                               }
-            self.eqs_il = StressNormIlyushin(thickness=self.fen.thickness)
+            self.eqs_il = StressNormIlyushin(thickness=self.fen.thickness, coupling=True)
             
             ## DG spaces/functions (For visualization)
             elem_dg3 = df.VectorElement("DG", self.fen.mesh.ufl_cell(), degree=self.DG_degree, dim=3)
@@ -28,6 +28,9 @@ class PostProcessShell(PostProcess):
             self.N_dg = df.Function(self.i_dg3, name="ResultSig_N")
             self.M_dg = df.Function(self.i_dg3, name="ResultSig_M")
             self.Q_dg = df.Function(self.i_dg2, name="ResultSig_Q")
+            self.N_eq_nrm_dg = df.Function(self.i_dg, name="N_eq_nrm") # suitable for comparing membrane/bending effects
+            self.M_eq_nrm_dg = df.Function(self.i_dg, name="M_eq_nrm") # suitable for comparing membrane/bending effects
+            self.sig_eq0_dg = df.Function(self.i_dg, name='EqSig_0')   # corresponding to s=0 (i.e. no coupling, see feniQS.material.shell_stress_resultant)
             self.sig_eq_dg = df.Function(self.i_dg, name='EqSig_s')    # corresponding to s=sign(P) (see feniQS.material.shell_stress_resultant)
             self.sig_eq_dg_1 = df.Function(self.i_dg, name='EqSig_s1') # corresponding to s=1 (see feniQS.material.shell_stress_resultant)
             self.sig_eq_dg_2 = df.Function(self.i_dg, name='EqSig_s2') # corresponding to s=-1 (see feniQS.material.shell_stress_resultant)
@@ -69,12 +72,17 @@ class PostProcessShell(PostProcess):
             Mxy = M_vec[:,2]
             qxz = Q_vec[:,0]
             qyz = Q_vec[:,1]
-            sig_eq = self.eqs_il.eq_stress_single(Nx=Nx, Ny=Ny, Nxy=Nxy \
+            Neq = self.eqs_il.eq_equivalent_N(Nx=Nx, Ny=Ny, Nxy=Nxy, normalize=True)
+            Meq = self.eqs_il.eq_equivalent_M(Mx=Mx, My=My, Mxy=Mxy, normalize=True)
+            sig_eq0, sig_eq = self.eqs_il.eq_stress_single(Nx=Nx, Ny=Ny, Nxy=Nxy \
                                                   , Mx=Mx, My=My, Mxy=Mxy \
                                                   , qxz=qxz, qyz=qyz)
             sig_eq_1, sig_eq_2 = self.eqs_il.eq_stresses_double(Nx=Nx, Ny=Ny, Nxy=Nxy \
                                                                 , Mx=Mx, My=My, Mxy=Mxy \
                                                                 , qxz=qxz, qyz=qyz)
+            self.N_eq_nrm_dg.vector()[:] = Neq[:]
+            self.M_eq_nrm_dg.vector()[:] = Meq[:]
+            self.sig_eq0_dg.vector()[:] = sig_eq0[:]
             self.sig_eq_dg.vector()[:] = sig_eq[:]
             self.sig_eq_dg_1.vector()[:] = sig_eq_1[:]
             self.sig_eq_dg_2.vector()[:] = sig_eq_2[:]
@@ -83,6 +91,9 @@ class PostProcessShell(PostProcess):
             self.xdmf.write(self.N_dg, t)
             self.xdmf.write(self.M_dg, t)
             self.xdmf.write(self.Q_dg, t)
+            self.xdmf.write(self.N_eq_nrm_dg, t)
+            self.xdmf.write(self.M_eq_nrm_dg, t)
+            self.xdmf.write(self.sig_eq0_dg, t)
             self.xdmf.write(self.sig_eq_dg, t)
             self.xdmf.write(self.sig_eq_dg_1, t)
             self.xdmf.write(self.sig_eq_dg_2, t)
