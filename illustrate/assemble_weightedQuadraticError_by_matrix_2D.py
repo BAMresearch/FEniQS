@@ -26,16 +26,17 @@ def visualize_projected_stress(q_ss, mesh, DG_degree):
 
 if __name__=='__main__':
     np.random.seed(1983)
-    shF_degree = 2 # Concerning virtual displacement
     integ_degree = 2 # Regarding Quadrature space that stores stresses
     ss_dim = 3 # For: sigma_xx, sigma_yy, sigma_xy
-    n_refinemensts = 2
+    n_refinemensts = 3
 
     ### MESH ###
     _scale = 1.0 # for geometry
     mesh = one_cell_mesh_2D(0., 0., _scale*20., _scale*10., -_scale*5., _scale*20.) # A mesh with ONE single cell
     for i in range(n_refinemensts):
         mesh = df.refine(mesh)
+    metadata = {"quadrature_degree": integ_degree, "quadrature_scheme": "default"}
+    dxm = df.dx(domain=mesh, metadata=metadata)
     plt.figure()
     df.plot(mesh)
     plt.title("2D lements")
@@ -53,49 +54,48 @@ if __name__=='__main__':
     if integ_degree > 1:
         visualize_projected_stress(q_ss, mesh, DG_degree=integ_degree)
 
-    ### NODAL INTERNAL FORCEs (entire vector) from stress vector ###
-        ## (1) Via df.assemble directly ##
-    elem_u = df.VectorElement(family='CG', cell=mesh.ufl_cell() \
-                            , degree=shF_degree, dim=2)
-    i_u = df.FunctionSpace(mesh, elem_u)
-    u_ = df.TestFunction(i_u)
-    def eps(v):
-        e = df.sym(df.grad(v))
-        return df.as_vector([e[0, 0], e[1, 1], 2 * e[0, 1]])
-    metadata = {"quadrature_degree": integ_degree, "quadrature_scheme": "default"}
-    dxm = df.dx(domain=mesh, metadata=metadata)
-    f_int = df.inner(eps(u_), q_ss) * dxm # internal forces
-    f_int_assembled = df.assemble(f_int).get_local()
-        
-        ## (2) Via an assembled matrix to be pre-multiplied by stress vector ##
-    assembler_matrix = df.inner(eps(u_), df.TrialFunction(i_ss)) * dxm
+    ### QUADRATIC ERROR "Q = Integral ( Sigma : S : Sigma )" ###
+        ## Space (scalar) for damage parameter at GPs
+    elem_GP = df.FiniteElement("Quadrature", mesh.ufl_cell(), degree=integ_degree \
+                                            , quad_scheme="default")
+    i_GP = df.FunctionSpace(mesh, elem_GP)
+    nGPs = i_GP.dim() # get total number of gauss points
+        ## Space (tensor) for "inverse tanget operator" (S) at GPs
+    elem_tensor = df.TensorElement("Quadrature", mesh.ufl_cell() \
+                                   , degree=integ_degree, shape=(ss_dim, ss_dim) \
+                                    , quad_scheme="default")
+    i_tensor = df.FunctionSpace(mesh, elem_tensor)
+    S_GP = df.Function(i_tensor, name="S: Inverse tangent operator at GPs")
+
+        ## Assign arbitrary inverse tangent operator (with random damage) at GPs
+    damage_level = 0.1
+    damages = abs(np.random.normal(0., damage_level, (nGPs,))) # strictly positive
+    damages = np.array([min(0.99, d) for d in damages]) # Upper bound = 0.99
+    S_GP_num = np.array([[4., -2., 1.], [-2., 8., -1.], [1., -1., 3.]])**(-1)
+    S_GPs_num = np.concatenate([d * S_GP_num.flatten() for d in damages])
+    S_GP.vector().set_local(S_GPs_num.flatten())
+
+        ## Compute Q by direct integration
+    Q1 = df.assemble(df.inner(q_ss, df.dot(S_GP, q_ss)) * dxm)
+
+        ## Compute Q via an assembled S_matrix
+    sig_trial = df.TrialFunction(i_ss)
+    sig_test = df.TestFunction(i_ss)
+    S_form = df.inner(sig_trial, df.dot(S_GP, sig_test)) * dxm
     if integ_degree>1:
         df.parameters["form_compiler"]["representation"] = "quadrature"
-    assembler_matrix_assembled = df.assemble(assembler_matrix).array()
+    S_matrix = df.assemble(S_form).array()
     df.parameters["form_compiler"]["representation"] = "uflacs"
-    f_int_assembled_2 = assembler_matrix_assembled @ q_ss.vector().get_local()
-    print(f"Assembly matrix for internal forces:\n\t{assembler_matrix_assembled}\n.")
-    plt.figure()
-    plt.imshow(assembler_matrix_assembled)
-    plt.title("Assembly matrix for internal forces\n(pre-multiplied with stress vector)")
-    plt.xlabel('DOF')
-    plt.ylabel('DOF')
-    plt.colorbar()
-    plt.show()
-
-    ### PLOT & CHECK ###
-    plt.figure()
-    plt.plot(f_int_assembled, linestyle='', marker='.' \
-             , color='blue', label='by direct assembly')
-    plt.plot(f_int_assembled_2, linestyle='', marker='o' \
-             , fillstyle='none', color='red', label='by pre-multiplied matrix')
-    plt.legend()
-    plt.title("Nodal internal forces from an arbitrary stress field")
-    plt.xlabel("DOF")
-    plt.ylabel("Internal force")
-    plt.show()
-    err_r_f = np.linalg.norm(f_int_assembled - f_int_assembled_2) / np.linalg.norm(f_int_assembled)
-    print(f"Relative norm-2-error in computed internal forces:\n\t{err_r_f:.2e}")
-    assert (err_r_f < 1e-12)
+    Q2 = np.einsum('m,mn,n->', q_ss.vector().get_local() \
+                   , S_matrix, q_ss.vector().get_local())
+    
+        ## Compare Q1 and Q2
+    err_r_Q = abs((Q1 - Q2) / Q1)
+    _msg = f"\nQuadratic Q = integral(sigma:S:sigma), computed by:"
+    _msg += f"\n\tdirect integration    = {Q1:.5f} ,"
+    _msg += f"\n\tmatrix multiplication = {Q2:.5f} ."
+    _msg += f"\nRelative error = {err_r_Q:.2e} ."
+    print(_msg)
+    assert (err_r_Q < 1e-12)
 
     print("\n----- DONE! -----") 
