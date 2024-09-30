@@ -12,6 +12,105 @@ f: file (only file name + format)
 ff: full file (path + file name + format)
 """
 
+def extrude_triangled_mesh_by_meshio(ff_mesh_surface, ff_mesh_extruded, dz, res=1):
+    """
+    ff_mesh_surface:
+        A file (full file name) that stores a surface mesh with triangle elements.
+        This mesh can also be over a 3-D surface (not necessarily on a plane), but
+        it must contain ONLY triangle cells.
+    
+    ff_mesh_extruded:
+        The target file (full file name) for storing the resultant 3-D mesh with tetrahedral elements.
+        
+    dz:
+        Either of the following:
+        - A float number, indicating the extrusion in z-direction, applied to all nodes of the surface mesh,
+        - A tuple/list of two numbers (usually positive/negative), indicating the extrusion in two opposite
+            directions along the z-axis, applied to all nodes of the surface mesh,
+        - A callable with the input argument being coordinates of a point on the surface mesh, which then
+            returns either of the following:
+            - one (out-of-plan) vector,
+            - a tuple/list of two (out-of-plan) vectors.
+            Each of such out-of-plane vectors potentially pertains to the extrusion of the triangled
+            surface mesh on one side of it.
+        NOTEs:
+        - The "z" direction and the vectors mentioned above are considered in the global coordinate system.
+        - If "dz" is a callable, it must return the same number of vectors (either one or two)
+            for all nodes of the triangled mesh. This means, this python method cannot selectively
+            extrude a selected part of the surface mesh at one/two sides, differently than other parts.
+            Also note that, this requirement is not checked/asserted in this implementation, thus,
+            a "dz" callable that does not meet this condition may create an unexpected mesh, potentially
+            without raising any errors/warnings.
+    
+    res:
+        Resolution (number of layers) per each side of extrusion, which is either one integer (for
+        one-side extrusion) or a tuple/list of two integers (for double-side extrusion).
+        This number of extrusion-sides must be consistent with the input "dz" (see above).
+    """
+    mesh = meshio.read(ff_mesh_surface)
+    if any([c.type!='triangle' for c in mesh.cells]):
+        raise ValueError(f"The input mesh must only contain triangle elements.")
+    ps = mesh.points
+    n_ps = ps.shape[0]
+    if ps.shape[1]==2:
+        ps3 = np.append(ps, np.zeros((n_ps,1)), axis=1)
+    else:
+        ps3 = ps
+    
+    if callable(dz):
+        def dz_of_i(i):
+            dz_i = dz(ps[i,:]) # a vector that reflects both direction and magnitude of extrusion
+            if not isinstance(dz_i, (tuple, list,)):
+                dz_i = (dz_i,)
+            return dz_i
+    else:
+        def dz_of_i(i):
+            return dz if isinstance(dz, (tuple, list,)) else (dz,)
+    dz0 = dz_of_i(0)
+    num_sides = len(dz0)
+    if isinstance(res, int):
+        res = [res] * num_sides
+    assert len(res)==num_sides
+    shift_nodes_side = [0, n_ps * res[0]]
+    res_total = sum(res)
+    ps_3d = np.concatenate((ps3, np.zeros((res_total*n_ps,3))), axis=0)
+    
+    dzs = [dz_of_i(i) for i in range(n_ps)]
+    if not all([len(dz_i)==num_sides for dz_i in dzs]):
+        raise ValueError("Extrusion must be applied to one or double sides for all nodes.")
+    
+    for i, dz_i in enumerate(dzs):
+        for i_side, dz_side in enumerate(dz_i):
+            for iz in range(1, res[i_side]+1):
+                shift = shift_nodes_side[i_side] + iz * n_ps
+                if isinstance(dz_side, (int, float,)):
+                    ps_3d[i+shift, :2] = ps3[i,:2]
+                    ps_3d[i+shift, 2] = iz*dz_side/res[i_side]
+                else:
+                    ps_3d[i+shift,:] = ps3[i,:] + iz*dz_side/res[i_side]
+    mesh.points = ps_3d
+    mesh.cells[0].type = 'tetra'
+    mesh.cells[0].dim = 3
+    
+    mesh_2d_cell_data = mesh.cells[0].data
+    n_cells_2d = mesh_2d_cell_data.shape[0]
+    mesh.cells[0].data = np.empty((res_total*n_cells_2d*3, 4), dtype=np.int32)
+    shift_cells_side = [0, res[0]*n_cells_2d*3]
+    for i_side in range(num_sides):
+        for iz in range(0, res[i_side]):
+            bb = 0 if iz==0 else shift_nodes_side[i_side]
+            cc = shift_nodes_side[i_side] if iz==0 else 0
+            mesh_2d_base = bb + mesh_2d_cell_data + n_ps * iz
+            for i in range(n_cells_2d):
+                cs_2d = mesh_2d_base[i]
+                aa = np.sort(cs_2d) # sorted (very crucial)
+                i0 = shift_cells_side[i_side] + (n_cells_2d*iz+i)*3
+                mesh.cells[0].data[i0, :] = [aa[0], aa[1], aa[2], aa[2]+n_ps+cc]
+                mesh.cells[0].data[i0+1, :] = [aa[0], aa[1], aa[2]+n_ps+cc, aa[1]+n_ps+cc]
+                mesh.cells[0].data[i0+2, :] = [aa[0], aa[0]+n_ps+cc, aa[1]+n_ps+cc, aa[2]+n_ps+cc]
+    
+    meshio.write(ff_mesh_extruded, mesh)
+
 def get_xdmf_mesh_by_meshio(ff_mesh, geo_dim, path_xdmf=None, _msg=True):
     """
     ff_mesh:
