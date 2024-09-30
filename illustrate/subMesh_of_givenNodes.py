@@ -46,7 +46,7 @@ def main(mesh, _alone_nodes=True):
     
 if __name__=="__main__":
     mesh = df.Mesh()
-    with df.XDMFFile('./illustrate/notched_rectangle.xdmf') as f:
+    with df.XDMFFile('./illustrate/files/notched_rectangle.xdmf') as f:
         f.read(mesh)
     main(mesh, True)
     main(mesh, False)
