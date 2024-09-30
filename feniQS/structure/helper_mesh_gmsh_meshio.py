@@ -46,6 +46,10 @@ def extrude_triangled_mesh_by_meshio(ff_mesh_surface, ff_mesh_extruded, dz, res=
         Resolution (number of layers) per each side of extrusion, which is either one integer (for
         one-side extrusion) or a tuple/list of two integers (for double-side extrusion).
         This number of extrusion-sides must be consistent with the input "dz" (see above).
+    
+    Reference:
+    This python method is based on the procedure of "Tetrahedral decomposition of triangular prism".
+    Specifically, see Fig.4 of http://dx.doi.org/10.1145/1186822.1073239 (also attached here as picture).
     """
     mesh = meshio.read(ff_mesh_surface)
     if any([c.type!='triangle' for c in mesh.cells]):
