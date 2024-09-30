@@ -7,7 +7,7 @@ if __name__=='__main__':
 
     ##### SURFACE MESH (input) #####
     ## (1) ##
-    ff_mesh_surface = "./illustrate/files/circle.xdmf"
+    ff_mesh_surface = "./illustrate/files/disk.xdmf"
     ## (2) ##
     # ff_mesh_surface = './illustrate/files/mesh_2d.xdmf'
     # mesh_surface = df.RectangleMesh(df.Point(0.,0.), df.Point(1.,1.), 1, 1)
