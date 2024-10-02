@@ -9,15 +9,23 @@ def yamlDump_pyObject_toDict(obj, full_name):
     _possible_types = (int, float, dict, list, str, bool, tuple)
     with open(full_name, 'w') as f:
         if isinstance(obj, dict):
-            aa = obj
+            A = obj
         else:
-            aa = obj.__dict__
-        ## CHECK types of object's attributes
-        for k in aa.keys():
-            if aa[k] is not None:
-                if not isinstance(aa[k], _possible_types):
-                    raise TypeError(f"The type of attribute {k} is {type(aa[k])}, which is not supported to be dumped to yaml file.")
-        yaml.dump(aa, f, sort_keys=False)
+            A = obj.__dict__
+        # Due to possible change of A's values (with their __dict__), we get a copy of it:
+        AA = {k: v for k, v in A.items()}
+        def _check_object_attributes(aa): # Checks types of attributes, and potentially replace them with their dictionary.
+            for k in aa.keys():
+                if (aa[k] is not None) and (not isinstance(aa[k], _possible_types)):
+                    try:
+                        aa[k] = aa[k].__dict__
+                        _check_object_attributes(aa[k])
+                    except:
+                        wrn = f"The type of attribute {k} is {type(aa[k])}, which is not supported to be dumped to yaml file."
+                        wrn += f"\nAn attempt to instead dump its dictionary (of its own attributes) failed either."
+                        raise TypeError(wrn)
+        _check_object_attributes(AA)
+        yaml.dump(AA, f, sort_keys=False)
 
 def yamlLoad_asDict(full_name):
     with open(full_name) as f:
