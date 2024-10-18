@@ -3,7 +3,7 @@ import meshio
 import gmsh
 import os
 
-from feniQS.general.general import make_path, CollectPaths
+from feniQS.general.general import make_path, CollectPaths, find_among_points
 
 pth_helper_mesh_gmsh_meshio = CollectPaths('./feniQS/structure/helper_mesh_gmsh_meshio.py')
 
@@ -12,7 +12,8 @@ f: file (only file name + format)
 ff: full file (path + file name + format)
 """
 
-def extrude_triangled_mesh_by_meshio(ff_mesh_surface, ff_mesh_extruded, dz, res=1):
+def extrude_triangled_mesh_by_meshio(ff_mesh_surface, ff_mesh_extruded, dz, res=1 \
+                                     , node_collections={}, tol=None):
     """
     ff_mesh_surface:
         A file (full file name) that stores a surface mesh with triangle elements.
@@ -47,6 +48,15 @@ def extrude_triangled_mesh_by_meshio(ff_mesh_surface, ff_mesh_extruded, dz, res=
         one-side extrusion) or a tuple/list of two integers (for double-side extrusion).
         This number of extrusion-sides must be consistent with the input "dz" (see above).
     
+    node_collections:
+        A dictionary whose each value is a collection of nodes (np.ndarray of coordinates)
+            , such that all of those coordinates belong to the nodes of the mesh "ff_mesh_surface".
+        During the extrusion, those collections are also extruded to their respective (extruded) collections.
+        So, the method returns a so-called extruded_node_collections.
+
+    tol:
+        A tolerance used only for finding node_collections among the surface mesh's nodes.
+    
     Reference:
     This python method is based on the procedure of "Tetrahedral decomposition of triangular prism".
     Specifically, see Fig.4 of http://dx.doi.org/10.1145/1186822.1073239 (also attached here as picture).
@@ -56,6 +66,21 @@ def extrude_triangled_mesh_by_meshio(ff_mesh_surface, ff_mesh_extruded, dz, res=
         raise ValueError(f"The input mesh must only contain triangle elements.")
     ps = mesh.points
     n_ps = ps.shape[0]
+    if len(node_collections)>1 and (tol is None): # we set a sensible tolerance
+        l = 0.
+        for i in range(3):
+            try:
+                l += (max(ps[:, i]) - min(ps[:, i])) ** 2
+            except IndexError:
+                pass
+        l = np.sqrt(l) # estimated diagonal of the bounding box containing the entire mesh
+        tol = l / ps.shape[0] / 1000.
+    extruded_node_collections_IDs = {}
+    for k, v in node_collections.items():
+        _ids = find_among_points(points=v, points0=ps, tol=tol)
+        if any ([_id is None for _id in _ids]):
+            raise ValueError(f"At least one node among the given node_collections does not belong to the surface mesh.")
+        extruded_node_collections_IDs[k] = _ids
     if ps.shape[1]==2:
         ps3 = np.append(ps, np.zeros((n_ps,1)), axis=1)
     else:
@@ -84,6 +109,7 @@ def extrude_triangled_mesh_by_meshio(ff_mesh_surface, ff_mesh_extruded, dz, res=
         raise ValueError("Extrusion must be applied to one or double sides for all nodes.")
     
     for i, dz_i in enumerate(dzs):
+        extruded_ids = []
         for i_side, dz_side in enumerate(dz_i):
             for iz in range(1, res[i_side]+1):
                 shift = shift_nodes_side[i_side] + iz * n_ps
@@ -92,9 +118,14 @@ def extrude_triangled_mesh_by_meshio(ff_mesh_surface, ff_mesh_extruded, dz, res=
                     ps_3d[i+shift, 2] = iz*dz_side/res[i_side]
                 else:
                     ps_3d[i+shift,:] = ps3[i,:] + iz*dz_side/res[i_side]
+                extruded_ids.append(i+shift)
+        for k in extruded_node_collections_IDs.keys():
+            if i in extruded_node_collections_IDs[k]:
+                extruded_node_collections_IDs[k] += extruded_ids
     mesh.points = ps_3d
     mesh.cells[0].type = 'tetra'
     mesh.cells[0].dim = 3
+    extruded_node_collections = {k: ps_3d[v,:] for k, v in extruded_node_collections_IDs.items()}
     
     mesh_2d_cell_data = mesh.cells[0].data
     n_cells_2d = mesh_2d_cell_data.shape[0]
@@ -114,6 +145,7 @@ def extrude_triangled_mesh_by_meshio(ff_mesh_surface, ff_mesh_extruded, dz, res=
                 mesh.cells[0].data[i0+2, :] = [aa[0], aa[0]+n_ps+cc, aa[1]+n_ps+cc, aa[2]+n_ps+cc]
     
     meshio.write(ff_mesh_extruded, mesh)
+    return extruded_node_collections
 
 def get_xdmf_mesh_by_meshio(ff_mesh, geo_dim, path_xdmf=None, _msg=True):
     """
