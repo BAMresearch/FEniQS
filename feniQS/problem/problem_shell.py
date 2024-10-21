@@ -5,6 +5,35 @@ pth_problem_shell = CollectPaths('./feniQS/problem/problem_shell.py')
 pth_problem_shell.add_script(pth_problem)
 pth_problem_shell.pths.remove(pth_damage.path0)
 
+class ElasticShellPars(ParsBase):
+    def __init__(self, pars0=None, **kwargs):
+        ParsBase.__init__(self, pars0)
+        if len(kwargs)==0:
+            self.constraint = 'PLANE_STRESS'
+            self.mat_type = 'elastic_shell'
+            
+            self.E_min = 0. # will be added to self.E
+            self.E = 1e6
+            self.nu = 0.3
+            self.shear_correction_factor = 1.
+            
+            fen_config = ShellFenConfigDefault()
+            self.el_family = fen_config.el_family
+            self.shF_degree_u = fen_config.shF_degree_u
+            self.shF_degree_theta = fen_config.shF_degree_theta
+            self.integ_degree = max(self.shF_degree_u, self.shF_degree_theta)
+            
+            self.softenned_pars = ['E']
+                # Parameters to be converted from/to FEniCS constant (to be modified more easily)
+            self._write_files = True
+            self.f = None # No body force
+            
+        else: # Get from a dictionary
+            ParsBase.__init__(self, **kwargs)
+        
+        if self.constraint!='PLANE_STRESS':
+            raise ValueError(f"Only PLANE_STRESS is supported.")
+
 class ShellFenConfigDefault:
     def __init__(self):
         self.shF_degree_u = 2
