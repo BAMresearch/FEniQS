@@ -15,7 +15,7 @@ class QuasiStaticSolveOptions(ParsBase):
         ## SOLVER
         if solver_options is None:
             solver_options = get_fenicsSolverOptions()
-        self.solver_options = solver_options # A dictionary; i.e. get_fenicsSolverOptions()
+        self.solver_options = remove_ineffective_fenicsSolverOptions(solver_options, _print=True)
         if len(options_dict)==0: # Default values are set
             ## TIME (general)
             self.t_start = 0.

@@ -3,6 +3,59 @@ from feniQS.general.general import CollectPaths
 
 pth_fenics_solvers = CollectPaths('./feniQS/problem/fenics_solvers.py')
 
+"""
+IMPORTANT NOTEs (in the implementation of this script):
+    NOTE-0:
+        An iterative (krylov) linear solver can be nested in a nonlinear solver, so far ONLY
+        when the type of that nonlinear solver is 'newton'.
+    NOTE-1:
+        If the linear solver nested in a nonlinear solver is going to be default (direct),
+        that linear solver cannot be customized (does NOT adopt any specifications).
+            (Or equivalently:)
+        The only customizable linear solver nested in a nonlinear solver is iterative (krylov).
+    NOTE-2:
+        If the linear solver nested in a nonlinear solver is going to be iterative (krylov),
+        the option 'tol_abs' of that linear solver is omitted; otherwise, convergence issues raise.
+"""
+
+def remove_ineffective_fenicsSolverOptions(solver_options, _print=True):
+    """
+    The input 'solver_options' generally is a dictionary with various items, some of which
+        may be ineffective, according to the implementation of solvers.
+    This method takes a copy of the input 'solver_options' and modifies it by removing
+        those ineffective options.
+    """
+    import copy
+    so = copy.deepcopy(solver_options)
+    lin_so = so['lin_sol_options']
+    nln_so = so['nln_sol_options']
+    _msg = 'WARNING (Solver Options):'; len_msg = len(_msg)
+    if isinstance(lin_so, str):
+        pass
+    else:
+        _type = lin_so['type']
+        if 'default' in _type.lower() or 'direct' in _type.lower():
+            if nln_so is None:
+                # One may have assigned the following ineffective options, which are now removed.
+                for k in ['method', 'precon']:
+                    _b = so['lin_sol_options'].pop(k, None)
+                    if _b:
+                        _msg += f"\n\tThe ineffective option '{k}' was removed from the linear solver options."
+            else:
+                so['lin_sol_options'] = 'default' # (see NOTE-1 above)
+                _msg += f"\n\tThe ineffective linear solver options were all removed and replaced with 'default'."
+        elif 'iterative' in _type.lower() or 'krylov' in _type.lower():
+            if nln_so is None:
+                pass
+            else:
+                so['lin_sol_options'].pop('tol_abs', None) # (see NOTE-2 above)
+                _msg += f"\n\tThe ineffective option 'tol_abs' was removed from the linear solver options."
+        else:
+            raise ValueError(f"The given linear solver options has unrecognized type='{_type}'. Valid types are: 'default', 'direct', 'iterative', 'krylov'.")
+    if _print and len(_msg)>len_msg:
+        print(_msg)
+    return so
+
 def get_fenicsSolverOptions(case='nonlinear', lin_sol='default'):
     nln_so = None # By default, NO need for nonlinear solver options
     if case.lower()=='nonlinear' or case.lower()=='nln':
@@ -12,7 +65,7 @@ def get_fenicsSolverOptions(case='nonlinear', lin_sol='default'):
         if nln_so is None:
             lin_so = get_default_linear_solver_options()
         else:
-            lin_so = 'default' # For now: a default linear solver nested in a nonlinear solver cannot adopt any specifications.
+            lin_so = 'default' # (see NOTE-1 above)
     elif lin_sol.lower()=='iterative' or lin_sol.lower()=='krylov':
         lin_so = get_Krylov_solver_options()
     else:
@@ -24,7 +77,10 @@ def get_fenicsSolverOptions(case='nonlinear', lin_sol='default'):
     }
 
 def get_default_linear_solver_options():
-    # NOT effective when having a nonlinear solver (see 'get_fenicsSolverOptions' above)
+    """
+    Options/parameters regarding a direct linear solver.
+        These are NOT effective when a linear solver is nested within a nonlinear solver (see NOTE-1 above).
+    """
     return {
     'type': 'default (direct)',
     'max_iters': 10,
@@ -41,7 +97,7 @@ def get_Krylov_solver_options():
     'type': 'iterative (krylov)',
     'max_iters': 10000,
     'allow_nonconvergence_error': False,
-    'tol_abs': 1e-10, # NOT effective when having a nonlinear solver (see 'get_nonlinear_solver' below)
+    'tol_abs': 1e-10,
     'tol_rel': 1e-8,
     'method': "gmres",
     'precon': "default",
@@ -81,13 +137,13 @@ def is_default_lin_sol_options(lin_so):
 def get_nonlinear_solver(solver_options, mpi_comm):
     nln_so = solver_options['nln_sol_options']
     lin_so = solver_options['lin_sol_options']
-    bb = is_default_lin_sol_options(lin_so)
+    bb = is_default_lin_sol_options(lin_so) # default (direct) linear solver
     
     if 'newton' in nln_so['type'].lower():
         if bb:
-            solver = df.NewtonSolver() # With all default options for the linear solver.
-            ## ?: how to adjust only tolerances and other options of the underlying LINEAR solver.
-        else: # iterative (Krylove)
+            solver = df.NewtonSolver()
+                # (see NOTE-1 above): How to customize the underlying default (direct) linear solver?
+        else:
             assert ('iterative' in lin_so['type'].lower()) or ('krylov' in lin_so['type'].lower())
             method = lin_so['method']
 
@@ -99,8 +155,7 @@ def get_nonlinear_solver(solver_options, mpi_comm):
             lin_solver.parameters['error_on_nonconvergence'] = lin_so['allow_nonconvergence_error']
             lin_solver.parameters['maximum_iterations'] = lin_so['max_iters']
             lin_solver.parameters['relative_tolerance'] = lin_so['tol_rel']
-            ## NOTE: The following absolute_tolerance would apparently hinder the convergence of the linear solver!
-            # lin_solver.parameters['absolute_tolerance'] = lin_so['tol_abs']
+            # lin_solver.parameters['absolute_tolerance'] = lin_so['tol_abs'] # Must be excluded (see NOTE-2 above)
             # lin_solver.parameters['monitor_convergence'] = True
             # lin_solver.parameters['nonzero_initial_guess'] = True
             
@@ -110,9 +165,10 @@ def get_nonlinear_solver(solver_options, mpi_comm):
         
     elif 'snes' in nln_so['type'].lower():
         if bb:
-            solver = df.PETScSNESSolver() # With all default options for the linear solver.
-            ## ?: how to adjust only tolerances and other options of the underlying LINEAR solver.
+            solver = df.PETScSNESSolver()
+                # (see NOTE-1 above): How to customize the underlying default (direct) linear solver?
         else:
+            # (see NOTE-0 above)
             raise NotImplementedError(f"Iterative linear solver together with 'snes' solver is not implemented.")
     else:
         raise KeyError(f"The nonlinear solver type '{nln_so['type']}' is not recognized.")
