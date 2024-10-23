@@ -154,7 +154,6 @@ class ParsBase:
         make_path(root)
         assert all([isinstance(p, ParsBase) for p in pars_list])
         assert len(pars_list)==len(pars_names)
-        pars_classes = [p.__class__ for p in pars_list]
         
         def get_path_and_names(_id):
             if len(subdir)==0:
@@ -188,9 +187,9 @@ class ParsBase:
         for _id in _ids:
             pth, files = get_path_and_names(_id)
             if len(files)==1:
-                hp = pars_classes[0](**yamlLoad_asDict(pth + files[0] + '.yaml')).get_hashable()
+                hp = ParsBase(**yamlLoad_asDict(pth + files[0] + '.yaml')).get_hashable()
             else:
-                ps = [pars_classes[i](**yamlLoad_asDict(pth + file + '.yaml')) for i, file in enumerate(files)]
+                ps = [ParsBase(**yamlLoad_asDict(pth + file + '.yaml')) for file in files]
                 hp = ParsBase.get_merged_hashable(pars_names, list_of_pars=ps)
             identifier_dict[hp] = _id
         
