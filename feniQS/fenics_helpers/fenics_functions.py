@@ -607,15 +607,15 @@ def update_BCs_of_t(bcs, t): # So far, not used
     for bc in bcs:
         pass # to be developed (depending on whether bc.value() expression had any 't' parameter)
 
-def boundary_condition(i, u, x):
+def boundary_condition(i, u, x, _get_dofs=True):
     bc = df.DirichletBC(i, u, x)
-    bc_dofs = [key for key in bc.get_boundary_values().keys()] # The global DOFs of bc
+    bc_dofs = list(bc.get_boundary_values().keys()) if _get_dofs else None # The global DOFs of bc
     return bc, bc_dofs
 
-def boundary_condition_pointwise(i, u, x):
+def boundary_condition_pointwise(i, u, x, _get_dofs=True):
     ## IMPORTANT: Definition of "x" must not have any "on_boundary", otherwise pointwise BC would not be created.
     bc = df.DirichletBC(i, u, x, method='pointwise')
-    bc_dofs = [key for key in bc.get_boundary_values().keys()] # The global DOFs of bc
+    bc_dofs = list(bc.get_boundary_values().keys()) if _get_dofs else None # The global DOFs of bc
     return bc, bc_dofs
 
 def bc_bar_both_ends(i, u_left=df.Constant(0.), u_right=df.Constant(1.0), L_bar=1.0, tol=1e-14):
