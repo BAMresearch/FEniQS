@@ -140,3 +140,46 @@ class QSModelPlasticity(QuasiStaticModel):
     
     def get_reaction_dofs(self, reaction_places):
         return self.struct.get_reaction_dofs(reaction_places, i_u=self.fen.get_iu())
+
+def run_QSM_plasticity_default(pars, solve_options, cls_struct \
+                               , _name=None, _path=None, _msg=True, _return=True):
+    # MODEL
+    model = get_QSM_Plasticity(
+        pars_struct=pars,
+        cls_struct=cls_struct,
+        pars_plasticity=pars,
+        _path=_path,
+        _name=_name,
+    )
+    # SOLVE
+    model.solve(solve_options)
+    # POST-PROCESS
+    try:
+        rps = solve_options.reaction_places
+    except AttributeError:
+        rps = solve_options['reaction_places']
+    pp0 = model.pps[0]
+    tits = [f"Reaction force at {rp}" for rp in rps]
+    file_names = [f"{model._path}reaction_force_{rp}" for rp in rps]
+    fss = pp0.plot_reaction_forces(tits=tits, full_file_names=file_names)
+    for ip, rp in enumerate(rps):
+        try:
+            struct_loading = model.struct.loadings[rp]
+            loaded_us = evaluate_expression_of_t(struct_loading, ts=pp0.ts)[1]
+            fs = fss[ip]
+            fig = plt.figure()
+            plt.plot(loaded_us, fs, marker='*', linestyle='--')
+            plt.title(f"Load-displacement at {rp}")
+            plt.xlabel('Displacement')
+            plt.ylabel('Force')
+            file_name = f"{model._path}load_displacement_{rp}"
+            plt.savefig(f"{file_name}.png", bbox_inches='tight', dpi=500)
+            plt.show()
+            ld = np.array([loaded_us, fs]).T
+            yamlDump_array(ld, f"{file_name}.yaml")
+        except KeyError:
+            pass
+    if _msg:
+        print(f"Quasi-static plasticity results stored in:\n\t'{model._path}'.")
+    if _return:
+        return model
