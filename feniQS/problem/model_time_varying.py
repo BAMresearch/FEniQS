@@ -79,9 +79,9 @@ class QuasiStaticModel:
         make_path(self._path)
         self.logger = LoggerSetup(self._path + self._name + '.log')
     
-    def revise_BCs(self, remove=False, new_BCs=[], _as='hom'):
+    def revise_BCs(self, remove=False, new_BCs=None, new_BCs_dofs=None, _as='hom'):
         try:
-            self.fen.revise_BCs(remove=remove, new_BCs=new_BCs, _as=_as)
+            self.fen.revise_BCs(remove=remove, new_BCs=new_BCs, new_BCs_dofs=new_BCs_dofs, _as=_as)
             _msg = "WARNING: The BCs of the model has been modified. Do consider rebuilding the solver given your desired solve_options."
             self.logger.console.warning(_msg)
             self.logger.file.warning(_msg)

@@ -274,23 +274,34 @@ class FenicsProblem():
     def _set_K_tangential(self):
         _F, _u = self.get_F_and_u()
         self.K_t_form = df.derivative(_F, _u)
-
-    def revise_BCs(self, remove=False, new_BCs=[], _as='hom'):
+    
+    def revise_BCs(self, remove=False, new_BCs=None, new_BCs_dofs=None, _as='hom'):
         """
         Treats original BCs of the fenics problem object.
         """
+        if new_BCs is None:
+            new_BCs = []; new_BCs_dofs = []
+        else:
+            if new_BCs_dofs is None:
+                new_BCs_dofs = len(new_BCs) * [None]
+            else:
+                assert len(new_BCs)==len(new_BCs_dofs)
         if remove:
             self.bcs_DR = []
             self.bcs_DR_dofs = []
             self.bcs_DR_inhom = []
             self.bcs_DR_inhom_dofs = []
-        for bc in new_BCs:
+        for bc, bc_dofs in zip(new_BCs, new_BCs_dofs):
+            if bc_dofs is None:
+                bc_dofs = list(bc.get_boundary_values().keys())
+            else:
+                assert isinstance(bc_dofs, list)
             if _as=='hom': # homogenous
                 self.bcs_DR.append(bc)
-                self.bcs_DR_dofs.extend([key for key in bc.get_boundary_values().keys()])
+                self.bcs_DR_dofs.extend(bc_dofs)
             else:
                 self.bcs_DR_inhom.append(bc)
-                self.bcs_DR_inhom_dofs.extend([key for key in bc.get_boundary_values().keys()])
+                self.bcs_DR_inhom_dofs.extend(bc_dofs)
     
     def _penalize_F(self, F):
         if len(self.penalty_dofs) > 0:

@@ -85,10 +85,12 @@ class QSModelElastic(QuasiStaticModel):
         """
         bcs_hom, bcs_inhom = self.struct.get_BCs(i_u=self.fen.get_iu(), fresh=True)
         self.time_varying_loadings.update(self.struct.get_time_varying_loadings())
-        bcs_hom = [bc['bc'] for bc in bcs_hom.values()]
-        bcs_inhom = [bc['bc'] for bc in bcs_inhom.values()]
-        self.revise_BCs(remove=True, new_BCs=bcs_hom, _as='hom')
-        self.revise_BCs(remove=False, new_BCs=bcs_inhom, _as='inhom')
+        bcs_hom_bcs = [bc['bc'] for bc in bcs_hom.values()]
+        bcs_hom_dofs = [bc['bc_dofs'] for bc in bcs_hom.values()]
+        bcs_inhom_bcs = [bc['bc'] for bc in bcs_inhom.values()]
+        bcs_inhom_dofs = [bc['bc_dofs'] for bc in bcs_inhom.values()]
+        self.revise_BCs(remove=True, new_BCs=bcs_hom_bcs, new_BCs_dofs=bcs_hom_dofs, _as='hom')
+        self.revise_BCs(remove=False, new_BCs=bcs_inhom_bcs, new_BCs_dofs=bcs_inhom_dofs, _as='inhom')
         
         penalty_features = self.struct.get_penalty_features(self.fen.get_iu())
         if len(penalty_features)>0:
