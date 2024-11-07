@@ -1,19 +1,20 @@
-import dolfin as df
-import matplotlib.pyplot as plt
-from feniQS.general.general import *
-from feniQS.fenics_helpers.fenics_functions import *
 from feniQS.problem.problem import *
 
-try:
-    import seaborn as sns
-    sns.set_theme(style="darkgrid") # style must be one of: white, dark, whitegrid, darkgrid, ticks
-except ModuleNotFoundError:
-    print(f"\n\n\t{'-' * 70}\n\tWARNING: It is recommended to install 'seaborn' to get nicer plots.\n\t{'-' * 70}\n\n")
-
 pth_post_process = CollectPaths('./feniQS/problem/post_process.py')
-pth_post_process.add_script(pth_general)
-pth_post_process.add_script(pth_fenics_functions)
 pth_post_process.add_script(pth_problem)
+
+def adjust_DG_degree_to_strain_degree(DG_degree, fen):
+    """
+        DG_degree is normally used for vizualization of history/damage variables or stress fields,
+        both of which are depending on strain quantities. Because strains have 1 lower degree than
+        displacements, the DG_degree should at most be "shF_degree_u - 1".
+    """
+    assert isinstance(DG_degree, int)
+    assert isinstance(fen, FenicsProblem)
+    if DG_degree > fen.shF_degree_u - 1:
+        print(f"\nWARNING (PostProcessor):\n\tThe DG-degree is changed to 'shF_degree - 1 = {fen.shF_degree_u - 1}'.")
+        DG_degree = fen.shF_degree_u - 1
+    return DG_degree
 
 def compute_Dg_dp(dg_dp, dg_du, dg_dK, Du_dp, DK_dp, free_dofs):
     # based on: https://git.bam.de/mechanics/ajafari/texts/-/blob/txt03_fw_2_incrementally/03_jacobian_by_perturbation/jac_of_fw_perturbation.pdf
@@ -74,7 +75,8 @@ class PostProcessEvalFunc:
         return f
 
 class PostProcess:
-    def __init__(self, fen, _name='', out_path=None, reaction_dofs=[], log_residual_vector=False, write_files=True):
+    def __init__(self, fen, _name='', out_path=None, reaction_dofs=[] \
+                 , log_residual_vector=False, write_files=True):
         self.fen = fen
         self.reaction_dofs = reaction_dofs # for which, the reaction force (residual) will be calculated
         self.log_residual_vector = log_residual_vector
@@ -204,13 +206,47 @@ class PostProcess:
                 pass
 
 class PostProcessGradientDamage(PostProcess):
-    def __init__(self, fen, _name='', out_path=None, reaction_dofs=None, log_residual_vector=False, write_files=True, DG_degree=1):
+    def __init__(self, fen, _name='', out_path=None, reaction_dofs=None \
+                 , log_residual_vector=False, write_files=True \
+                 , DG_degree=1, projection_type='local'):
         super().__init__(fen, _name, out_path, reaction_dofs, log_residual_vector, write_files)
         if self.write_files:
-            self._q_space = df.FunctionSpace(self.fen.mesh, "DG", DG_degree)
-            self.D = df.Function(self._q_space, name='Damage')
+            self.DG_degree = adjust_DG_degree_to_strain_degree(DG_degree, self.fen)
+            self.projection_type = projection_type.lower()
+
+            elem_dg = df.FiniteElement("DG", self.fen.mesh.ufl_cell(), degree=self.DG_degree)
+            self.i_dg = df.FunctionSpace(self.fen.mesh, elem_dg)
+            self.D = df.Function(self.i_dg, name='Damage')
             if self.fen.hist_storage=='quadrature':
-                self.K = df.Function(self._q_space, name='Kappa')
+                self.K = df.Function(self.i_dg, name='Kappa')
+                if self.projection_type=='local':
+                    self._local_projector_K = LocalProjector(expr=self.fen.u_K_current \
+                                                             , V=self.i_dg, dxm=self.fen.dxm)
+            if self.projection_type=='local':
+                D_ufl = self.fen.mat.gK.g(self.fen.u_K_current)
+                self._local_projector_D = LocalProjector(expr=D_ufl, V=self.i_dg, dxm=self.fen.dxm)
+            else:
+                self.integ_degree = self.fen.integ_degree
+                self._form_compiler_parameters = {"quadrature_degree": self.integ_degree,
+                                                  "quad_scheme": "default",}
+    
+    def _project_K(self):
+        if self.fen.hist_storage=='quadrature':
+            if self.projection_type=='local':
+                self._local_projector_K(u=self.K)
+            else:
+                df.project(v=self.fen.u_K_current, V=self.i_dg, function=self.K \
+                                , form_compiler_parameters=self._form_compiler_parameters)
+        else:
+            print(f"No projection is required, since history variables are NOT on quadrature space.")
+    
+    def _project_D(self):
+        if self.projection_type=='local':
+            self._local_projector_D(u=self.D)
+        else:
+            D_ufl = self.fen.mat.gK.g(self.fen.u_K_current)
+            df.project(v=D_ufl, V=self.i_dg, function=self.D \
+                        , form_compiler_parameters=self._form_compiler_parameters)
 
     def __call__(self, t, logger):
         super().__call__(t, logger)
@@ -218,79 +254,112 @@ class PostProcessGradientDamage(PostProcess):
             ebar_plot = self.fen.u_mix.split()[1]
             self.xdmf.write(ebar_plot, t)
             if self.fen.hist_storage=='quadrature':
-                df.project(v=self.fen.u_K_current, V=self._q_space, function=self.K \
-                    , form_compiler_parameters={"quadrature_degree":self.fen.integ_degree, "quad_scheme":"default"})
+                self._project_K()
                 self.xdmf.write(self.K, t)
             else:
                 self.xdmf.write(self.fen.u_K_current, t) # This does not work for "u_K_current" being in quadrature space
-            D_ufl = self.fen.mat.gK.g(self.fen.u_K_current)
-            df.project(v=D_ufl, V=self._q_space, function=self.D \
-                , form_compiler_parameters={"quadrature_degree":self.fen.integ_degree, "quad_scheme":"default"})
+            self._project_D()
             self.xdmf.write(self.D, t)
 
 class PostProcessPlastic(PostProcess):
-    def __init__(self, fen, _name='', out_path=None, reaction_dofs=None, log_residual_vector=False, write_files=True, DG_degree=1):
+    def __init__(self, fen, _name='', out_path=None, reaction_dofs=None \
+                 , log_residual_vector=False, write_files=True \
+                 , DG_degree=1, projection_type='local'):
         super().__init__(fen, _name, out_path, reaction_dofs, log_residual_vector, write_files)
         if self.write_files:
-            elem_dg0_k = df.FiniteElement("DG", self.fen.mesh.ufl_cell(), degree=DG_degree)
-            elem_dg0_ss = df.VectorElement("DG", self.fen.mesh.ufl_cell(), degree=DG_degree, dim=self.fen.mat.ss_dim)
-            self.i_k = df.FunctionSpace(self.fen.mesh, elem_dg0_k)
-            self.i_ss = df.FunctionSpace(self.fen.mesh, elem_dg0_ss)
+            self.DG_degree = adjust_DG_degree_to_strain_degree(DG_degree, self.fen)
+            self.projection_type = projection_type.lower()
+
+            elem_dg = df.FiniteElement("DG", self.fen.mesh.ufl_cell(), degree=self.DG_degree)
+            elem_dg_ss = df.VectorElement("DG", self.fen.mesh.ufl_cell(), degree=self.DG_degree, dim=self.fen.mat.ss_dim)
+            self.i_dg = df.FunctionSpace(self.fen.mesh, elem_dg)
+            self.i_dg_ss = df.FunctionSpace(self.fen.mesh, elem_dg_ss)
             
-            self.sig = df.Function(self.i_ss, name='Stress')
-            self.eps_p = df.Function(self.i_ss, name='Cumulated plastic strain')
-            self.K = df.Function(self.i_k, name='Cumulated Kappa')
+            self.sig = df.Function(self.i_dg_ss, name='Stress')
+            self.eps_p = df.Function(self.i_dg_ss, name='Cumulated plastic strain')
+            self.K = df.Function(self.i_dg, name='Cumulated Kappa')
+
+            if self.projection_type=='local':
+                self._local_projector_sig = LocalProjector(expr=self.fen.sig \
+                                                        , V=self.i_dg_ss, dxm=self.fen.dxm)
+                self._local_projector_eps_p = LocalProjector(expr=self.fen.eps_p \
+                                                        , V=self.i_dg_ss, dxm=self.fen.dxm)
+                self._local_projector_K = LocalProjector(expr=self.fen.kappa \
+                                                        , V=self.i_dg, dxm=self.fen.dxm)
+            else:
+                self.integ_degree = self.fen.integ_degree
+                self._form_compiler_parameters = {"quadrature_degree": self.integ_degree,
+                                                  "quad_scheme": "default",}
+
+    def _project_sig(self):
+        if self.projection_type=='local':
+            self._local_projector_sig(u=self.sig)
+        else:
+            df.project(v=self.fen.sig, V=self.i_dg_ss, function=self.sig \
+                , form_compiler_parameters=self._form_compiler_parameters)
+    
+    def _project_eps_p(self):
+        if self.projection_type=='local':
+            self._local_projector_eps_p(u=self.eps_p)
+        else:
+            df.project(v=self.fen.eps_p, V=self.i_dg_ss, function=self.eps_p \
+                , form_compiler_parameters=self._form_compiler_parameters)
+    
+    def _project_K(self):
+        if self.projection_type=='local':
+            self._local_projector_K(u=self.K)
+        else:
+            df.project(v=self.fen.kappa, V=self.i_dg, function=self.K \
+                , form_compiler_parameters=self._form_compiler_parameters)
 
     def __call__(self, t, logger):
         super().__call__(t, logger)
         if self.write_files:
             ### project from quadrature space to DG space
-            form_compiler_parameters = {"quadrature_degree":self.fen.integ_degree, "quad_scheme":"default"}
-            df.project(v=self.fen.sig, V=self.i_ss, function=self.sig \
-                , form_compiler_parameters=form_compiler_parameters)
-            df.project(v=self.fen.eps_p, V=self.i_ss, function=self.eps_p \
-                , form_compiler_parameters=form_compiler_parameters)
-            df.project(v=self.fen.kappa, V=self.i_k, function=self.K \
-                , form_compiler_parameters=form_compiler_parameters)
+            self._project_sig()
+            self._project_eps_p()
+            self._project_K()
             ### write projected values to xdmf-files
             self.xdmf.write(self.K, t)
             self.xdmf.write(self.sig, t)
             self.xdmf.write(self.eps_p, t)
 
 class PostProcessPlasticGDM(PostProcess):
-    def __init__(self, fen, _name='', out_path=None, reaction_dofs=None, log_residual_vector=False, write_files=True, DG_degree=1):
+    def __init__(self, fen, _name='', out_path=None, reaction_dofs=None \
+                 , log_residual_vector=False, write_files=True, DG_degree=1):
         super().__init__(fen, _name, out_path, reaction_dofs, log_residual_vector, write_files)
         if self.write_files:
+            self.DG_degree = adjust_DG_degree_to_strain_degree(DG_degree, self.fen)
             # DG spaces
-            elem_dg0_k = df.FiniteElement("DG", self.fen.mesh.ufl_cell(), degree=DG_degree)
-            elem_dg0_ss = df.VectorElement("DG", self.fen.mesh.ufl_cell(), degree=DG_degree, dim=self.fen.mat.ss_dim)
-            self.i_k = df.FunctionSpace(self.fen.mesh, elem_dg0_k)
-            self.i_ss = df.FunctionSpace(self.fen.mesh, elem_dg0_ss)
+            elem_dg = df.FiniteElement("DG", self.fen.mesh.ufl_cell(), degree=self.DG_degree)
+            elem_dg_ss = df.VectorElement("DG", self.fen.mesh.ufl_cell(), degree=self.DG_degree, dim=self.fen.mat.ss_dim)
+            self.i_dg = df.FunctionSpace(self.fen.mesh, elem_dg)
+            self.i_dg_ss = df.FunctionSpace(self.fen.mesh, elem_dg_ss)
             
             # damage-related quantities
-            self.sig = df.Function(self.i_ss, name='Actual (damaged) stress')
+            self.sig = df.Function(self.i_dg_ss, name='Actual (damaged) stress')
             self.ebar_plot = self.fen.u_mix.split()[1]
             self.ebar_plot.rename('Nonlocal strain', 'Nonlocal strain')
-            self.Kd = df.Function(self.i_k, name='Kappa_damage (cumulated)')
-            self.D = df.Function(self.i_k, name='Damage')
+            self.Kd = df.Function(self.i_dg, name='Kappa_damage (cumulated)')
+            self.D = df.Function(self.i_dg, name='Damage')
             # plasticity-related quantities
-            self.eps_p = df.Function(self.i_ss, name='Cumulated plastic strain')
-            self.Kp = df.Function(self.i_k, name='Kappa_plastic (cumulated)')
+            self.eps_p = df.Function(self.i_dg_ss, name='Cumulated plastic strain')
+            self.Kp = df.Function(self.i_dg, name='Kappa_plastic (cumulated)')
     
     def __call__(self, t, logger):
         super().__call__(t, logger)
         if self.write_files:
             ### project from quadrature space to DG space
             form_compiler_parameters = {"quadrature_degree":self.fen.integ_degree, "quad_scheme":"default"}
-            df.project(v=self.fen.q_sigma, V=self.i_ss, function=self.sig \
+            df.project(v=self.fen.q_sigma, V=self.i_dg_ss, function=self.sig \
                 , form_compiler_parameters=form_compiler_parameters)
-            df.project(v=self.fen.q_k, V=self.i_k, function=self.Kd \
+            df.project(v=self.fen.q_k, V=self.i_dg, function=self.Kd \
                 , form_compiler_parameters=form_compiler_parameters)
-            df.project(v=self.fen.mat.gK.g(self.fen.q_k), V=self.i_k, function=self.D \
+            df.project(v=self.fen.mat.gK.g(self.fen.q_k), V=self.i_dg, function=self.D \
                 , form_compiler_parameters=form_compiler_parameters)
-            df.project(v=self.fen.q_eps_p, V=self.i_ss, function=self.eps_p \
+            df.project(v=self.fen.q_eps_p, V=self.i_dg_ss, function=self.eps_p \
                 , form_compiler_parameters=form_compiler_parameters)
-            df.project(v=self.fen.q_k_plastic, V=self.i_k, function=self.Kp \
+            df.project(v=self.fen.q_k_plastic, V=self.i_dg, function=self.Kp \
                 , form_compiler_parameters=form_compiler_parameters)
             
             ### write projected values to xdmf-files
