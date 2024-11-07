@@ -46,7 +46,7 @@ class DoitTaskManager:
         return [[True] for i in range(nst)]
 
 
-def run_pydoit_task(tasks, basename, verbosity=2):
+def run_pydoit_task(tasks, basename, verbosity=2, reset_dep=False):
     """
     Source:
         https://pydoit.org/extending.html#example-pre-defined-task
@@ -81,4 +81,9 @@ def run_pydoit_task(tasks, basename, verbosity=2):
                         td['name'] = f"{basename}:{td['name']}"
                     task_list.append(dict_to_task(td))
             return task_list
-    DoitMain(MyLoader()).run([])
+    doit_instance = DoitMain(MyLoader())
+    if reset_dep:
+        doit_instance.run(['reset-dep'])
+        doit_instance.run(['run'])
+    else:
+        doit_instance.run(['run'])
