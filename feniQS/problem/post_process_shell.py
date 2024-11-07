@@ -9,10 +9,10 @@ class PostProcessShell(PostProcess):
     def __init__(self, fen, _name='', out_path=None, reaction_dofs=None \
                  , log_residual_vector=False, write_files=True, DG_degree=1, integ_degree=None):
         super().__init__(fen, _name, out_path, reaction_dofs, log_residual_vector, write_files)
-        self.integ_degree = self.fen.integ_degree if integ_degree is None else integ_degree
-        self.DG_degree = DG_degree
         # NOTE: Stress Resultants are N:membrane, M:bending, Q:shear
         if self.write_files:
+            self.DG_degree = adjust_DG_degree_to_strain_degree(DG_degree, self.fen)
+            self.integ_degree = self.fen.integ_degree if integ_degree is None else integ_degree
             self._form_compiler_parameters = {"quadrature_degree":self.integ_degree,
                                               "quad_scheme":"default",
                                               }
