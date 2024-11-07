@@ -540,25 +540,35 @@ class LocalProjector:
     def __init__(self, expr, V, dxm):
         """
         expr:
-            expression to project
+            expression/function to be projected.
         V:
-            quadrature function space
+            a function space to which the projection is performed.
         dxm:
             dolfin.Measure("dx") that matches V
+        Source:
+            https://comet-fenics.readthedocs.io/en/latest/tips_and_tricks.html
         """
-        dv = df.TrialFunction(V)
-        v_ = df.TestFunction(V)
+        self.V = V
+        dv = df.TrialFunction(self.V)
+        v_ = df.TestFunction(self.V)
         a_proj = df.inner(dv, v_) * dxm
         b_proj = df.inner(expr, v_) * dxm
         self.solver = df.LocalSolver(a_proj, b_proj)
         self.solver.factorize()
 
-    def __call__(self, u):
+    def __call__(self, u=None):
         """
         u:
-            function that is filled with the solution of the projection
+            resultant projected function
+            (if given, must live on self.V; otherwise, will be created and returned).
         """
-        self.solver.solve_local_rhs(u)
+        if u is None:
+            u = df.Function(self.V)
+            self.solver.solve_local_rhs(u)
+            return u
+        else:
+            assert isinstance(u, df.Function)
+            self.solver.solve_local_rhs(u)
 
 
 def compute_residual(F, bcs_dofs, reaction_dofs=[], logger=None, u_sol=None, u_F=None, write_residual_vector=False):
