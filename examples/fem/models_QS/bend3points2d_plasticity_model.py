@@ -34,9 +34,13 @@ class ParsBeam2dPlastic:
         # yield strength
         self.sig0 = 150.0
         
-        # Hardening modulus
+        # Hardening
         Et = self.E / 100.0
-        self.H = 10 * self.E * Et / (self.E - Et)
+        self.hardening_isotropic_law = {
+            'law': 'linear',
+            'modulus': 10 * self.E * Et / (self.E - Et),
+            'sig_u': None, # No ultimate strength
+            }
         
         self._plot = True
         self._write_files = True
@@ -73,7 +77,8 @@ class Bend3points2dPlasticModel:
                                       , unit_res=self.pars.unit_res, refined_s=self.pars.refined_s)
         
         ### MATERIAL ###
-        yf = Yield_VM(self.pars.sig0, constraint=self.pars.constraint, H=self.pars.H)
+        yf = Yield_VM(self.pars.sig0, constraint=self.pars.constraint
+                      , hardening_isotropic_law=self.pars.hardening_isotropic_law)
         ## perfect plasticity (No hardening)
         # mat = PlasticConsitutivePerfect(self.pars.E, nu=self.pars.nu \
         #                                 , constraint=self.pars.constraint, yf=yf)

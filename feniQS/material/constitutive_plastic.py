@@ -217,12 +217,36 @@ class PlasticConsitutiveRateIndependentHistory(PlasticConsitutivePerfect):
             return sig_tr, self.D, k0, 0.0
                 
 class Yield_VM:
-    def __init__(self, y0, constraint, H=0):
+    def __init__(self, y0, constraint, hardening_isotropic_law=None):
         self.y0 = y0 # yield stress
         self.constraint = constraint
         self.ss_dim = ss_dim(self.constraint)
-        self.H = H # isotropic hardening modulus
         self.vm_norm = NormVM(self.constraint, stress_norm=True)
+        
+        if hardening_isotropic_law is None: # perfect plasticity
+            hardening_isotropic_law = {'modulus': 0.}
+        else:
+            modulus = hardening_isotropic_law['modulus']
+            if modulus!=0.: # isotropic hardening
+                assert modulus>0.
+                assert 'law' in hardening_isotropic_law.keys()
+                if hardening_isotropic_law['law']=='linear':
+                    _b = not 'sig_u' in hardening_isotropic_law.keys()
+                    _b = _b or (hardening_isotropic_law['sig_u'] is None)
+                    if _b:
+                        hardening_isotropic_law['sig_u'] = np.inf
+                        self._K0 = np.inf
+                    else:
+                        self._K0 = (hardening_isotropic_law['sig_u'] - self.y0) / modulus
+                        self._modulus2 = modulus/100.
+                            # : to avoid convergence issues, we set much smaller hardening modulus after ultimate strength is met.
+                elif hardening_isotropic_law['law']=='exponential':
+                    assert 'sig_u' in hardening_isotropic_law.keys() # and msut be a real number.
+                    self._dy = hardening_isotropic_law['sig_u'] - self.y0
+                else:
+                    raise ValueError(f"Isotropic hardening law is not recognized.")
+                assert hardening_isotropic_law['sig_u']>self.y0
+        self.ihl = hardening_isotropic_law
         
     def __call__(self, stress, kappa=0):
         """
@@ -237,15 +261,32 @@ class Yield_VM:
         """
         assert (len(stress) == self.ss_dim)
         se, m = self.vm_norm(stress)
-        f = se - (self.y0 + self.H * kappa)
-        fk = - self.H
+
+        if self.ihl['modulus']==0.:
+            f = se - self.y0
+            fk = 0.
+        else:
+            if self.ihl['law']=='linear':
+                if kappa>self._K0:
+                    kappa2 = kappa - self._K0
+                    _y0 = self.ihl['sig_u'] + self._modulus2 * kappa2
+                    f = se - _y0
+                    fk = - self._modulus2
+                else:
+                    f = se - (self.y0 + self.ihl['modulus'] * kappa)
+                    fk = - self.ihl['modulus']
+            elif self.ihl['law']=='exponential':
+                _exp = np.exp(-self.ihl['modulus']*kappa)
+                f = se - self.y0 - self._dy * (1. - _exp)
+                fk = - self._dy * self.ihl['modulus'] * _exp
+
         if self.ss_dim==1:
-            dm = 0.0 # no dependency on "self.H"
+            dm = 0.0 # no dependency on any hardening modulus
             mk = 0.0
         else:
             if se ==0:
                 dm = None # no needed in such a case
             else:
-                dm = (6 * se * self.vm_norm.P - 6 * np.outer(self.vm_norm.P @ stress, m)) / (4 * se ** 2) # no dependency on "self.H"
+                dm = (6 * se * self.vm_norm.P - 6 * np.outer(self.vm_norm.P @ stress, m)) / (4 * se ** 2) # no dependency on any hardening modulus
             mk = np.array(len(stress) * [0.0])
         return f, np.atleast_1d(m), np.atleast_2d(dm), fk, np.atleast_1d(mk)

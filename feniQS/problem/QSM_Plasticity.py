@@ -44,13 +44,18 @@ class QSModelPlasticity(QuasiStaticModel):
         ### MATERIAL ###
         if self.pars.yield_surf['type'].lower()=='von-mises':
             sig0 = self.pars.yield_surf['pars']['sig0']
-            H = self.pars.hardening_isotropic['modulus']
-            yf = Yield_VM(sig0, constraint=self.pars.constraint, H=H)
-            hhp = self.pars.hardening_isotropic['hypothesis']
-            if H == 0: ## perfect plasticity (No hardening)
+            hardening_isotropic_law = {
+                'law': self.pars.hardening_isotropic['law'],
+                'modulus': self.pars.hardening_isotropic['modulus'],
+                'sig_u': self.pars.hardening_isotropic['sig_u'],
+            }
+            yf = Yield_VM(sig0, constraint=self.pars.constraint
+                          , hardening_isotropic_law=hardening_isotropic_law)
+            if self.pars.hardening_isotropic['modulus'] == 0: ## perfect plasticity (No hardening)
                 mat = PlasticConsitutivePerfect(E=self.pars.E+self.pars.E_min \
                                                 , nu=self.pars.nu, constraint=self.pars.constraint, yf=yf)
             else: ## Isotropic-hardenning plasticity
+                hhp = self.pars.hardening_isotropic['hypothesis']
                 if hhp.lower() == 'unit':
                     ri = RateIndependentHistory() # p = 1, i.e.: kappa_dot = lamda_dot
                 elif hhp.lower() == 'plastic-work':

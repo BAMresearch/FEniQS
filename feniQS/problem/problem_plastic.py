@@ -7,6 +7,43 @@ pth_problem_plastic.add_script(pth_problem)
 pth_problem_plastic.add_script(pth_fenics_functions)
 pth_problem_plastic.add_script(pth_constitutive_plastic)
 
+class IsotropicHardeningPars(ParsBase):
+    _type = 'isotropic'
+    _hypotheses = ['unit', 'plastic-work']
+    _laws = ['linear', 'exponential']
+    def __init__(self, hypothesis='unit', law='linear', modulus=0., sig_u=None, **kwargs):
+        """
+        hypothesis:
+            specifies how the history variable (kappa) evolves (based on other quantities such as strain)
+        law:
+            specifies how the yield strength (sy) of material evolves based on the initial strength (sy0)
+                and the history variable kappa.
+            law = 'linear':
+                sy = sy0 + modulus * kappa
+                This linear evolution goes for ever if 'sig_u' is None. Otherwise, as soon as 'sy' reaches 'sig_u',
+                it stays at that value (constant 'sig_u'). This would mean a perfect plasticity with a yield strength
+                equal to 'sig_u', which may cuase convergence issues. Thus, after this threshold of 'sig_u' is met,
+                normally a much smaller modulus (e.g. 0.01 * modulus) is still taken into account.
+            law = 'exponential':
+                sy = sy0 + (sig_u - sy0) * (1 - exp(-modulus*kappa))
+        """
+        if not (hypothesis.lower() in IsotropicHardeningPars._hypotheses):
+            raise ValueError(f"Possible hardening hypotheses are: {IsotropicHardeningPars._hypotheses}.")
+        if not (law.lower() in IsotropicHardeningPars._laws):
+            raise ValueError(f"Possible hardening laws are: {IsotropicHardeningPars._laws}.")
+        self.hypothesis = hypothesis.lower()
+        self.law = law.lower()
+        if modulus==0.:
+            print(f"\nWARNING (isotropic hardening):\n\tA zero hardening modulus deactivates any hardening.")
+        self.modulus = modulus
+        if self.law=='exponential' and (sig_u is None):
+            raise ValueError(f"An exponential hardening law requires ultimate strength 'sig_u'.")
+        self.sig_u = sig_u
+        if len(kwargs)==0: # Default values are set
+            pass
+        else: # Get from a dictionary
+            ParsBase.__init__(self, **kwargs)
+
 class PlasticityPars(ParsBase):
     def __init__(self, pars0=None, **kwargs):
         ParsBase.__init__(self, pars0)
@@ -24,9 +61,11 @@ class PlasticityPars(ParsBase):
             
             self.yield_surf = {'type': 'von-mises'}
             self.yield_surf['pars'] = {'sig0': 10.0}
-            self.hardening_isotropic = {'modulus': 0.}
-            self.hardening_isotropic['hypothesis'] = 'unit' # or 'plastic-work'
-
+            self.hardening_isotropic = \
+                IsotropicHardeningPars(hypothesis='unit' # or 'plastic-work'
+                                       , law='linear'
+                                       , modulus=0.
+                                       , sig_u=None).__dict__
             self.el_family = 'CG'
             self.shF_degree_u = 1
             self.integ_degree = 2
@@ -42,6 +81,9 @@ class PlasticityPars(ParsBase):
             
         else: # Get from a dictionary
             ParsBase.__init__(self, **kwargs)
+        if self.hardening_isotropic['sig_u'] is not None:
+            if self.hardening_isotropic['sig_u']<=self.yield_surf['pars']['sig0']:
+                raise ValueError(f"Ultimate strength must be greater than yield strength.")
 
 class FenicsPlastic(FenicsProblem, df.NonlinearProblem):
     def __init__(self, mat, mesh, fen_config, dep_dim=None):

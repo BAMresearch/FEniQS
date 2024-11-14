@@ -18,7 +18,8 @@ def revise_pars_plasticity_cantileverBeam2d(pars):
         # (2) No hardening
     # H = 0.0
 
-    pars_plastic.hardening_isotropic = {'modulus': H}
+    pars_plastic.hardening_isotropic['modulus'] = H
+    pars_plastic.hardening_isotropic['law'] = 'linear'
     pars_plastic.hardening_isotropic['hypothesis'] = 'unit' # or 'plastic-work'
 
 def pp_plasticity_cantileverBeam2d(model, solve_options, lz=1.0, sz=14, _format='.png'):

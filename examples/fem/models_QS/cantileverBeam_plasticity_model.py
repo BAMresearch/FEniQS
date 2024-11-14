@@ -62,11 +62,15 @@ class ParsCantileverBeamPlastic(ParsCantileverBeam):
         # self.sig0 = 1e13 # leads to elastic case
         
         ### NO Hardening
-        # self.H = 0.0 # Hardening modulus
+        # self.hardening_isotropic_law = None
         
         ### ISOTROPIC Hardening
         Et = self.E / 100.0
-        self.H = 15 * self.E * Et / (self.E - Et) # Hardening modulus
+        self.hardening_isotropic_law = {
+            'law': 'linear',
+            'modulus': 15 * self.E * Et / (self.E - Et),
+            'sig_u': None, # No ultimate strength
+            }
         ## Hardening hypothesis
         self.hardening_hypothesis = 'unit' # denoting the type of the harding function "P(sigma, kappa)"
         # self.hardening_hypothesis = 'plastic-work'
@@ -76,8 +80,8 @@ class CantileverBeamPlasticModel:
         self.pars = pars
         if _name is None:
             _name = 'CantBeamPlastic_deg' + str(FenicsConfig.shF_degree_u) + '_' + str(self.pars.constraint) + '_H=' \
-                + '%.1f'%self.pars.H
-            if self.pars.H != 0:
+                + '%.1f'%self.pars.hardening_isotropic_law['modulus']
+            if self.pars.hardening_isotropic_law['modulus'] != 0:
                 _name  += '_P=' + self.pars.hardening_hypothesis
         self._name = _name
         self._set_logger_and_path()
@@ -110,8 +114,9 @@ class CantileverBeamPlasticModel:
                               , res_x, res_y, res_z)
         
         ### MATERIAL ###
-        yf = Yield_VM(self.pars.sig0, constraint=self.pars.constraint, H=self.pars.H)
-        if self.pars.H == 0: ## perfect plasticity (No hardening)
+        yf = Yield_VM(self.pars.sig0, constraint=self.pars.constraint
+                      , hardening_isotropic_law=self.pars.hardening_isotropic_law)
+        if self.pars.hardening_isotropic_law['modulus'] == 0: ## perfect plasticity (No hardening)
             mat = PlasticConsitutivePerfect(self.pars.E, nu=self.pars.nu, constraint=self.pars.constraint, yf=yf)
         else: ## Isotropic-hardenning plasticity
             if self.pars.hardening_hypothesis == 'unit':
@@ -172,8 +177,8 @@ class CantileverBeamPlasticModel:
             
             if len(reaction_dofs) > 0:
                 sz=14
-                _tit = 'Reaction force at top-left node, ' + str(self.pars.constraint) + ', H=' + '%.1f'%self.pars.H
-                if self.pars.H != 0:
+                _tit = 'Reaction force at top-left node, ' + str(self.pars.constraint) + ', H=' + '%.1f'%self.pars.hardening_isotropic_law['modulus']
+                if self.pars.hardening_isotropic_law['modulus'] != 0:
                     _tit  += ', P=' + self.pars.hardening_hypothesis
                 
                 if self.pars.geo_dim == 2:
@@ -187,7 +192,7 @@ class CantileverBeamPlasticModel:
                 plt.figure()
                 if self.pars.geo_dim == 2: # to plot reference MATLAB solution
                     f_sol = self.pars.lz * np.array(pps[0].reaction_forces[0])
-                    if self.pars.H == 0 and self.pars.loading.level == 0.65 and self.pars.loading.case=='ramp':
+                    if self.pars.hardening_isotropic_law['modulus'] == 0 and self.pars.loading.level == 0.65 and self.pars.loading.case=='ramp':
                         _u, _f = read_ref_sol_MATLAB()
                         plt.plot(-_u, self.pars.lz * _f, marker='', label='MATLAB')
                 elif self.pars.geo_dim == 3:
