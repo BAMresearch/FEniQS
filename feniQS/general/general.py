@@ -794,3 +794,16 @@ def plot_convergence_of_Us(Uss, ch_IDs=None, _path='./'):
     plt.savefig(_path + f"mesh_errors_{ll}.png", bbox_inches='tight', dpi=300)
     
     plt.show()
+
+def convert_string_to_color(input_string, colormap="viridis"):
+    """
+    Convert a string to a color by hashing it and mapping to a Matplotlib colormap.
+    colormap (str): The name of the Matplotlib colormap to use (default is 'viridis').
+    Returns an RGBA color tuple.
+    """
+    import hashlib
+    import matplotlib.cm as cm
+    string_hash = int(hashlib.md5(input_string.encode('utf-8')).hexdigest(), 16)
+    normalized_value = (string_hash & 0xFFFFFFFF) / 0xFFFFFFFF # in range [0.1] 
+    cmap = cm.get_cmap(colormap)
+    return cmap(normalized_value) # Returns RGBA
