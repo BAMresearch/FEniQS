@@ -58,7 +58,7 @@ class Bend3points2dPlasticModel:
         
     def _set_logger_and_path(self):
         # Setting name and path for results
-        self._path = str(Path(__file__).parent) + '/' + self._name + '/'
+        self._path = f"./examples/fem/models_QS/{self._name}/"
         make_path(self._path)
         self.logger = LoggerSetup(self._path + self._name + '.log')
         
@@ -113,7 +113,8 @@ class Bend3points2dPlasticModel:
               time_adjusting_methods=[], time_adjusting_args={}, other_pps=[], _reset=True):
         
         pps = []
-        pps.append(PostProcess(self.fen, self._name, self._path, reaction_dofs=reaction_dofs, write_files=self.pars._write_files))
+        pps.append(PostProcessPlastic(fen=self.fen, _name=self._name, out_path=self._path \
+                                      , reaction_dofs=reaction_dofs, write_files=self.pars._write_files))
         pps += other_pps
         
         # define time-stepper
