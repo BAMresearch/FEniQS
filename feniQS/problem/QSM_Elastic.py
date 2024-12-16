@@ -68,7 +68,7 @@ class QSModelElastic(QuasiStaticModel):
     def set_pps(self, solve_options, DG_degree=0):
         self.pps = []
         reaction_dofs = self.get_reaction_dofs(reaction_places=solve_options.reaction_places)
-        self.pps.append(PostProcess(self.fen, self._name, self._path \
+        self.pps.append(PostProcessElastic(self.fen, self._name, self._path \
                         , reaction_dofs=reaction_dofs, write_files=self.pars._write_files))
         for pp in self.pps_default.values():
             self.pps.append(pp)

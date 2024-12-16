@@ -205,10 +205,56 @@ class PostProcess:
             except FileNotFoundError:
                 pass
 
+class PostProcessElastic(PostProcess):
+    def __init__(self, fen, _name='', out_path=None, reaction_dofs=None \
+                 , log_residual_vector=False, write_files=True \
+                 , DG_degree=0, projection_type='local'):
+        super().__init__(fen, _name, out_path, reaction_dofs, log_residual_vector, write_files)
+        if self.write_files:
+            self.DG_degree = adjust_DG_degree_to_strain_degree(DG_degree, self.fen)
+            self.projection_type = projection_type.lower()
+
+            elem_dg = df.FiniteElement("DG", self.fen.mesh.ufl_cell(), degree=self.DG_degree)
+            elem_dg_ss = df.VectorElement("DG", self.fen.mesh.ufl_cell(), degree=self.DG_degree, dim=self.fen.mat.ss_dim)
+            self.i_dg = df.FunctionSpace(self.fen.mesh, elem_dg)
+            self.i_dg_ss = df.FunctionSpace(self.fen.mesh, elem_dg_ss)
+            
+            self.sig = df.Function(self.i_dg_ss, name='Stress')
+            self.sig_VM = df.Function(self.i_dg, name='VM stress')
+            self._sig_ufl_vec = sigma_vector(sigma=self.fen.sig_u, constraint=self.fen.mat.constraint)
+            self._vm_norm_calculator = NormVM(constraint=self.fen.mat.constraint, stress_norm=True)
+
+            if self.projection_type=='local':
+                self._local_projector_sig = LocalProjector(expr=self._sig_ufl_vec \
+                                                        , V=self.i_dg_ss, dxm=self.fen.dxm)
+            else:
+                self.integ_degree = self.fen.integ_degree
+                self._form_compiler_parameters = {"quadrature_degree": self.integ_degree,
+                                                  "quad_scheme": "default",}
+
+    def _project_sig(self):
+        if self.projection_type=='local':
+            self._local_projector_sig(u=self.sig)
+        else:
+            df.project(v=self._sig_ufl_vec, V=self.i_dg_ss, function=self.sig \
+                , form_compiler_parameters=self._form_compiler_parameters)
+
+    def __call__(self, t, logger):
+        super().__call__(t, logger)
+        if self.write_files:
+            ### project from quadrature space to DG space
+            self._project_sig()
+            ### compute VM stress over DG space
+            sss = self.sig.vector().get_local().reshape((-1, self.fen.mat.ss_dim))
+            self._vm_norm_calculator.get_norms(sss=sss, s_vm=self.sig_VM)
+            ### write projected values to xdmf-files
+            self.xdmf.write(self.sig, t)
+            self.xdmf.write(self.sig_VM, t)
+
 class PostProcessGradientDamage(PostProcess):
     def __init__(self, fen, _name='', out_path=None, reaction_dofs=None \
                  , log_residual_vector=False, write_files=True \
-                 , DG_degree=1, projection_type='local'):
+                 , DG_degree=0, projection_type='local'):
         super().__init__(fen, _name, out_path, reaction_dofs, log_residual_vector, write_files)
         if self.write_files:
             self.DG_degree = adjust_DG_degree_to_strain_degree(DG_degree, self.fen)
@@ -264,7 +310,7 @@ class PostProcessGradientDamage(PostProcess):
 class PostProcessPlastic(PostProcess):
     def __init__(self, fen, _name='', out_path=None, reaction_dofs=None \
                  , log_residual_vector=False, write_files=True \
-                 , DG_degree=1, projection_type='local'):
+                 , DG_degree=0, projection_type='local'):
         super().__init__(fen, _name, out_path, reaction_dofs, log_residual_vector, write_files)
         if self.write_files:
             self.DG_degree = adjust_DG_degree_to_strain_degree(DG_degree, self.fen)
@@ -278,6 +324,9 @@ class PostProcessPlastic(PostProcess):
             self.sig = df.Function(self.i_dg_ss, name='Stress')
             self.eps_p = df.Function(self.i_dg_ss, name='Cumulated plastic strain')
             self.K = df.Function(self.i_dg, name='Cumulated Kappa')
+            self.sig_VM = df.Function(self.i_dg, name='VM stress') # on DG space
+            self._vm_norm_calculator = NormVM(constraint=self.fen.mat.constraint, stress_norm=True)
+            self._sig_VM_s = df.Function(self.fen.i_hist, name="VM stress") # on Quadrature space
 
             if self.projection_type=='local':
                 self._local_projector_sig = LocalProjector(expr=self.fen.sig \
@@ -285,6 +334,8 @@ class PostProcessPlastic(PostProcess):
                 self._local_projector_eps_p = LocalProjector(expr=self.fen.eps_p \
                                                         , V=self.i_dg_ss, dxm=self.fen.dxm)
                 self._local_projector_K = LocalProjector(expr=self.fen.kappa \
+                                                        , V=self.i_dg, dxm=self.fen.dxm)
+                self._local_projector_sig_VM = LocalProjector(expr=self._sig_VM_s \
                                                         , V=self.i_dg, dxm=self.fen.dxm)
             else:
                 self.integ_degree = self.fen.integ_degree
@@ -311,22 +362,34 @@ class PostProcessPlastic(PostProcess):
         else:
             df.project(v=self.fen.kappa, V=self.i_dg, function=self.K \
                 , form_compiler_parameters=self._form_compiler_parameters)
+    
+    def _project_sig_VM(self):
+        if self.projection_type=='local':
+            self._local_projector_sig_VM(u=self.sig_VM)
+        else:
+            df.project(v=self._sig_VM_s, V=self.i_dg, function=self.sig_VM \
+                , form_compiler_parameters=self._form_compiler_parameters)
 
     def __call__(self, t, logger):
         super().__call__(t, logger)
         if self.write_files:
+            ### compute VM stress over quadrature space
+            sss = self.fen.sig.vector().get_local().reshape((-1, self.fen.mat.ss_dim))
+            self._vm_norm_calculator.get_norms(sss=sss, s_vm=self._sig_VM_s)
             ### project from quadrature space to DG space
             self._project_sig()
             self._project_eps_p()
             self._project_K()
+            self._project_sig_VM()
             ### write projected values to xdmf-files
             self.xdmf.write(self.K, t)
             self.xdmf.write(self.sig, t)
             self.xdmf.write(self.eps_p, t)
+            self.xdmf.write(self.sig_VM, t)
 
 class PostProcessPlasticGDM(PostProcess):
     def __init__(self, fen, _name='', out_path=None, reaction_dofs=None \
-                 , log_residual_vector=False, write_files=True, DG_degree=1):
+                 , log_residual_vector=False, write_files=True, DG_degree=0):
         super().__init__(fen, _name, out_path, reaction_dofs, log_residual_vector, write_files)
         if self.write_files:
             self.DG_degree = adjust_DG_degree_to_strain_degree(DG_degree, self.fen)
