@@ -1,7 +1,7 @@
 from feniQS.structure.helper_mesh_fenics import *
 import matplotlib.pyplot as plt
 
-def visualize_projected_stress(q_ss, mesh, DG_degree=1):
+def visualize_projected_stress(q_ss, mesh, DG_degree=0):
     ### PROJECT STRESS on DG-space ###
     elem_ss_DG = df.VectorElement(family="DG", cell=mesh.ufl_cell(), \
                          degree=DG_degree, dim=ss_dim, quad_scheme="default")

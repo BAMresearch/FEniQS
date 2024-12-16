@@ -86,7 +86,7 @@ class QSModelGDM(QuasiStaticModel):
         self.fen.build_solver(solver_options=solve_options.solver_options, time_varying_loadings=tvls)
         self.solver_built = True
         
-    def set_pps(self, solve_options, DG_degree=1):
+    def set_pps(self, solve_options, DG_degree=0):
         self.pps = []
         reaction_dofs = self.get_reaction_dofs(reaction_places=solve_options.reaction_places)
         _n = 'model' if self._name=='' else self._name

@@ -7,7 +7,7 @@ pth_post_process_shell.add_script(pth_shell_stress_resultant)
 
 class PostProcessShell(PostProcess):
     def __init__(self, fen, _name='', out_path=None, reaction_dofs=None \
-                 , log_residual_vector=False, write_files=True, DG_degree=1, integ_degree=None):
+                 , log_residual_vector=False, write_files=True, DG_degree=0, integ_degree=None):
         super().__init__(fen, _name, out_path, reaction_dofs, log_residual_vector, write_files)
         # NOTE: Stress Resultants are N:membrane, M:bending, Q:shear
         if self.write_files:
