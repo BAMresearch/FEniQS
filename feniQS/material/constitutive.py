@@ -52,13 +52,33 @@ class NormVM:
                 m = np.sign(ss[0])
         else:
             assert (len(ss)==self.ss_dim)
-            se = (1.5 * ss.T @ self.P @ ss) ** 0.5
+            se = np.sqrt(1.5 * ss @ self.P @ ss.T)
             if se == 0:
                 m = np.zeros(self.ss_dim)  # using central difference method
                 # m = np.sqrt(1.5 * np.diag(self.P)) # using forward difference method
             else:
                 m = (1.5 / se) * self.P @ ss
         return se, m
+    
+    def get_norms(self, sss, s_vm=None):
+        """
+        sss: an array with the shape (n_ss, self.ss_dim), where n_ss is the number of instances of ss.
+        So, this method computes VM norm for a bunch of stress/strain vectors (all collected in one array) and:
+            - returns these norms as a new vector,
+            or
+            - assigns these norms into the entries of the given vector/function 's_vm'.
+        """
+        assert sss.shape[1]==self.ss_dim
+        if s_vm is None:
+            return np.sqrt(1.5 * np.einsum('im,mn,in->i', sss, self.P, sss))
+        else:
+            if isinstance(s_vm, np.ndarray):
+                assert sss.shape[0]==len(s_vm)
+                s_vm[:] = np.sqrt(1.5 * np.einsum('im,mn,in->i', sss, self.P, sss))[:]
+            elif isinstance(s_vm, df.Function):
+                s_vm.vector().set_local(np.sqrt(1.5 * np.einsum('im,mn,in->i', sss, self.P, sss))[:])
+            else:
+                raise ValueError(f"The type '{type(s_vm)}' for the input 's_vm' is not supported.")
 
 class ElasticConstitutive():
     def __init__(self, E, nu, constraint):
