@@ -116,7 +116,21 @@ class StructureFEniCS():
                 raise KeyError(_msg)
             dofs.append(dofs_rp)
         
-        return dofs # A list of lists each being DOFs related to a reaction place    
+        return dofs # A list of lists each being DOFs related to a reaction place
+    
+    def get_coordinates(self, coordinate_places=None, resolution=None):
+        """
+            coordinate_places: A list of string objects, whose each entry specifies a place at which
+                points coordinates are returned.
+            resolution: An integer or float number that specifies the resolution of points, whose
+                coordinates are returned.
+            This method returns a dictionary with keys being coordinate_places, and each value being
+                a list of the respective points coordinates.
+        """
+        if (coordinate_places is None) or (len(coordinate_places)==0):
+            return {}
+        else:
+            raise NotImplementedError(f"Overwrite the method 'get_coordinates', handling the input 'coordinate_places':\n\t{coordinate_places}.")
     
     def build_special_fenics_fields(self):
         """
