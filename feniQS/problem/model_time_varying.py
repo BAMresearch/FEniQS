@@ -29,6 +29,7 @@ class QuasiStaticSolveOptions(ParsBase):
             self.increase_factor = 1.2
             ## POST-PROCESS
             self.reaction_places = []
+            self.stress_places = []
             ## OTHERs
             self._reset = True
             self._plot = True
