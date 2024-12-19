@@ -2,25 +2,25 @@ from feniQS.structure.struct_cantilever_beam import *
 from feniQS.problem.QSM_Plasticity import *
 
 def revise_pars_plasticity_cantileverBeam2d(pars):
-    pars_plastic.shF_degree_u = 3
-    pars_plastic.integ_degree = 4
+    pars.shF_degree_u = 3
+    pars.integ_degree = 4
 
-    pars_plastic.constraint = 'PLANE_STRESS'
-    pars_plastic.E = 1000.
-    pars_plastic.nu = 0.3
-    pars_plastic.yield_surf = {'type': 'von-mises'}
-    pars_plastic.yield_surf['pars'] = {'sig0': 12.0}
+    pars.constraint = 'PLANE_STRESS'
+    pars.E = 1000.
+    pars.nu = 0.3
+    pars.yield_surf = {'type': 'von-mises'}
+    pars.yield_surf['pars'] = {'sig0': 12.0}
 
     ### ISOTROPIC Hardening modulus
         # (1)
-    Et = pars_plastic.E / 100.0
-    H = 15 * pars_plastic.E * Et / (pars_plastic.E - Et)
+    Et = pars.E / 100.0
+    H = 15 * pars.E * Et / (pars.E - Et)
         # (2) No hardening
     # H = 0.0
 
-    pars_plastic.hardening_isotropic['modulus'] = H
-    pars_plastic.hardening_isotropic['law'] = 'linear'
-    pars_plastic.hardening_isotropic['hypothesis'] = 'unit' # or 'plastic-work'
+    pars.hardening_isotropic['modulus'] = H
+    pars.hardening_isotropic['law'] = 'linear'
+    pars.hardening_isotropic['hypothesis'] = 'unit' # or 'plastic-work'
 
 def pp_plasticity_cantileverBeam2d(model, solve_options, lz=1.0, sz=14, _format='.png'):
     pp0 = model.pps[0]
