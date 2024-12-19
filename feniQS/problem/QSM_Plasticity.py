@@ -148,7 +148,7 @@ class QSModelPlasticity(QuasiStaticModel):
 
 def run_QSM_plasticity_default(pars, solve_options, cls_struct \
                                , _name=None, _path=None, _msg=True, _return=True):
-    # MODEL
+    ### MODEL ###
     model = get_QSM_Plasticity(
         pars_struct=pars,
         cls_struct=cls_struct,
@@ -156,34 +156,61 @@ def run_QSM_plasticity_default(pars, solve_options, cls_struct \
         _path=_path,
         _name=_name,
     )
-    # SOLVE
+    ### SOLVE ###
     model.solve(solve_options)
-    # POST-PROCESS
+    ### POST-PROCESS ###
+    pp0 = model.pps[0]
+    ## Reaction forces
     try:
         rps = solve_options.reaction_places
     except AttributeError:
         rps = solve_options['reaction_places']
-    pp0 = model.pps[0]
     tits = [f"Reaction force at {rp}" for rp in rps]
     file_names = [f"{model._path}reaction_force_{rp}" for rp in rps]
     fss = pp0.plot_reaction_forces(tits=tits, full_file_names=file_names)
-    for ip, rp in enumerate(rps):
-        try:
-            struct_loading = model.struct.loadings[rp]
-            loaded_us = evaluate_expression_of_t(struct_loading, ts=pp0.ts)[1]
-            fs = fss[ip]
-            fig = plt.figure()
-            plt.plot(loaded_us, fs, marker='*', linestyle='--')
-            plt.title(f"Load-displacement at {rp}")
-            plt.xlabel('Displacement')
-            plt.ylabel('Force')
-            file_name = f"{model._path}load_displacement_{rp}"
-            plt.savefig(f"{file_name}.png", bbox_inches='tight', dpi=500)
-            plt.show()
-            ld = np.array([loaded_us, fs]).T
-            yamlDump_array(ld, f"{file_name}.yaml")
-        except KeyError:
-            pass
+    try:
+        struct_loadings = model.struct.loadings
+        for ip, rp in enumerate(rps):
+            try:
+                struct_loading = struct_loadings[rp]
+                loaded_us = evaluate_expression_of_t(struct_loading, ts=pp0.ts)[1]
+                fs = fss[ip]
+                fig = plt.figure()
+                plt.plot(loaded_us, fs, marker='*', linestyle='--')
+                plt.title(f"Load-displacement at {rp}")
+                plt.xlabel('Displacement')
+                plt.ylabel('Force')
+                file_name = f"{model._path}load_displacement_{rp}"
+                plt.savefig(f"{file_name}.png", bbox_inches='tight', dpi=500)
+                plt.show()
+                ld = np.array([loaded_us, fs]).T
+                yamlDump_array(ld, f"{file_name}.yaml")
+            except KeyError:
+                print(f"WARNING (Post-process):\n\tThe structure's loadings attribute does not include reaction_place={rp}. Respective load-displacement data was not extracted.")
+    except AttributeError:
+        print(f"WARNING (Post-process):\n\tThe structure has no attribute 'loadings' containing dictionary of loading signals. No load-displacement data was extracted.")
+    ## Stresses
+    try:
+        sps = solve_options.stress_places
+    except AttributeError:
+        sps = solve_options['stress_places']
+    try:
+        stress_points = model.struct.get_coordinates(coordinate_places=sps, resolution=None)
+        for sp in sps:
+            _points = stress_points[sp]
+            if (_points is None) or (len(_points)==0):
+                print(f"WARNING (Post-process):\n\tStructure's 'get_coordinates' method returned no points for stress_place '{sp}'. Respective stress data was not extracted.")
+            else:
+                _points = np.array(_points)
+                _stresses = pp0.eval_checked_sig(points=_points)
+                _sig_comp = np.array(_stresses['components']) # hierarchy : time, points, stress_components
+                _sig_VM = np.array(_stresses['VM']) # hierarchy : time, points
+                yamlDump_array(_points, f"{model._path}coordinates_{sp}.yaml")
+                yamlDump_array(_sig_comp, f"{model._path}stresses_components_{sp}.yaml")
+                yamlDump_array(_sig_VM, f"{model._path}stresses_VM_{sp}.yaml")
+    except (NotImplementedError):
+        print(f"WARNING (Post-process):\n\tAll stress_places '{sps}' were ignored. The 'get_coordinates' method is not implemented/overwritten for the respective structure.")
+    ### RETURNs ###
     if _msg:
         print(f"Quasi-static plasticity results stored in:\n\t'{model._path}'.")
     if _return:
