@@ -79,6 +79,8 @@ if __name__ == "__main__":
     solver_options = get_fenicsSolverOptions(lin_sol='direct') # regarding a single load-step
     solve_options = QuasiStaticSolveOptions(solver_options) # regarding incremental solution
     solve_options.t_end = model_plastic.pars.loading_t_end
+    n_ch = 10
+    solve_options.checkpoints = [float(a) for a in np.linspace(solve_options.t_end/n_ch, solve_options.t_end, n_ch)]
     solve_options.dt = 0.01
     solve_options.dt_max = 0.05
     solve_options.reaction_places = ['left_y', 'right_y']
