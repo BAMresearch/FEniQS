@@ -180,6 +180,30 @@ class PostProcess:
             vals.append(np.array(u_ts))
         return vals
     
+    def eval_checked_sig(self, points):
+        if hasattr(self, 'sig'):
+            sig_read = self.sig
+        else:
+            sig_read = None
+            print(f"WARNING (Post-process):\n\tNo stress components are computed and stored.")
+        if hasattr(self, 'sig_VM'):
+            sig_VM_read = self.sig_VM
+        else:
+            sig_VM_read = None
+            print(f"WARNING (Post-process):\n\tNo VM stresses are computed and stored.")
+        vals = {'components': [], 'VM': []}
+        num_checkpoints = len(self.checkpoints)
+        for ts in range(num_checkpoints):
+            if sig_read is not None:
+                self.xdmf_checked.read_checkpoint(sig_read, 'sigma', ts)
+                sig_ts = [sig_read(p) for p in points]
+                vals['components'].append(np.array(sig_ts))
+            if sig_VM_read is not None:
+                self.xdmf_checked.read_checkpoint(sig_VM_read, 'sigma_VM', ts)
+                sig_VM_ts = [sig_VM_read(p) for p in points]
+                vals['VM'].append(np.array(sig_VM_ts))
+        return vals
+    
     def eval_checked_reaction_forces(self):
         return self.reaction_forces_checked # hierarchy : reactions-group, time, DOFs
     
@@ -250,6 +274,11 @@ class PostProcessElastic(PostProcess):
             ### write projected values to xdmf-files
             self.xdmf.write(self.sig, t)
             self.xdmf.write(self.sig_VM, t)
+            
+            for tt in self.checkpoints:
+                if abs(t - tt) < 1e-9:
+                    self.xdmf_checked.write_checkpoint(self.sig, 'sigma', t, append=True)
+                    self.xdmf_checked.write_checkpoint(self.sig_VM, 'sigma_VM', t, append=True)
 
 class PostProcessGradientDamage(PostProcess):
     def __init__(self, fen, _name='', out_path=None, reaction_dofs=None \
@@ -386,6 +415,11 @@ class PostProcessPlastic(PostProcess):
             self.xdmf.write(self.sig, t)
             self.xdmf.write(self.eps_p, t)
             self.xdmf.write(self.sig_VM, t)
+            
+            for tt in self.checkpoints:
+                if abs(t - tt) < 1e-9:
+                    self.xdmf_checked.write_checkpoint(self.sig, 'sigma', t, append=True)
+                    self.xdmf_checked.write_checkpoint(self.sig_VM, 'sigma_VM', t, append=True)
 
 class PostProcessPlasticGDM(PostProcess):
     def __init__(self, fen, _name='', out_path=None, reaction_dofs=None \
