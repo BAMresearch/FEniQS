@@ -185,12 +185,12 @@ class PostProcess:
             sig_read = self.sig
         else:
             sig_read = None
-            print(f"WARNING (Post-process):\n\tNo stress components are computed and stored.")
+            print(f"WARNING (Post-process):\n\tNo stress components are computed and stored at checkpoints.")
         if hasattr(self, 'sig_VM'):
             sig_VM_read = self.sig_VM
         else:
             sig_VM_read = None
-            print(f"WARNING (Post-process):\n\tNo VM stresses are computed and stored.")
+            print(f"WARNING (Post-process):\n\tNo VM stresses are computed and stored at checkpoints.")
         vals = {'components': [], 'VM': []}
         num_checkpoints = len(self.checkpoints)
         for ts in range(num_checkpoints):
