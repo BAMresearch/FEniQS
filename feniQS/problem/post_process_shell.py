@@ -97,3 +97,45 @@ class PostProcessShell(PostProcess):
             self.xdmf.write(self.sig_eq_dg, t)
             self.xdmf.write(self.sig_eq_dg_1, t)
             self.xdmf.write(self.sig_eq_dg_2, t)
+
+            for tt in self.checkpoints:
+                if abs(t - tt) < 1e-9:
+                    self.xdmf_checked.write_checkpoint(self.N_dg, 'N_dg', t, append=True)
+                    self.xdmf_checked.write_checkpoint(self.M_dg, 'M_dg', t, append=True)
+                    self.xdmf_checked.write_checkpoint(self.Q_dg, 'Q_dg', t, append=True)
+                    self.xdmf_checked.write_checkpoint(self.N_eq_nrm_dg, 'N_eq_nrm_dg', t, append=True)
+                    self.xdmf_checked.write_checkpoint(self.M_eq_nrm_dg, 'M_eq_nrm_dg', t, append=True)
+                    self.xdmf_checked.write_checkpoint(self.sig_eq0_dg, 'sig_eq0_dg', t, append=True)
+                    self.xdmf_checked.write_checkpoint(self.sig_eq_dg, 'sig_eq_dg', t, append=True)
+                    self.xdmf_checked.write_checkpoint(self.sig_eq_dg_1, 'sig_eq_dg_1', t, append=True)
+                    self.xdmf_checked.write_checkpoint(self.sig_eq_dg_2, 'sig_eq_dg_2', t, append=True)
+    
+    def eval_checked_stress_resultants(self, points, _which='all'):
+        all_srs = ['N_dg', 'M_dg', 'Q_dg',
+                   'N_eq_nrm_dg', 'M_eq_nrm_dg',
+                   'sig_eq0_dg', 'sig_eq_dg',
+                   'sig_eq_dg_1', 'sig_eq_dg_2'] # all possible (potentially-available) QoIs related to stress resultants
+        if _which=='all':
+            _which = all_srs
+        else:
+            assert all([_sr in all_srs for _sr in _which])
+        readers = dict()
+        vals = dict()
+        for _sr in _which:
+            vals[_sr] = []
+            try:
+                readers[_sr] = getattr(self, _sr)
+            except AttributeError:
+                readers[_sr] = None
+                print(f"WARNING (Post-process):\n\tComponent '{_sr}' of stress resultants is NOT computed and stored at checkpoints.")
+        num_checkpoints = len(self.checkpoints)
+        for ts in range(num_checkpoints):
+            for _sr in _which:
+                if readers[_sr] is not None:
+                    self.xdmf_checked.read_checkpoint(readers[_sr], _sr, ts)
+                    sr_ts = [readers[_sr](p) for p in points]
+                    vals[_sr].append(np.array(sr_ts))
+        return vals
+
+    def eval_checked_sig(self, points):
+        raise NotImplementedError(f"The shell formulation contains no conventional stresses. Use the method 'eval_checked_stress_resultants', instead.")
