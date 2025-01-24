@@ -12,6 +12,109 @@ f: file (only file name + format)
 ff: full file (path + file name + format)
 """
 
+def get_mesh_points_and_cells(mesh_or_mesh_file, meshio_cell_type=None):
+    """
+    mesh_or_mesh_file:
+        either a mesh file (supported by meshio) or a mesh object (of dolfin or meshio).
+    Returns:
+        mesh 'nodes' as a numpy array object.
+        mesh 'cells' either as a dictionary (if meshio_cell_type is None),
+            or as a numpy array object (for the meshio_cell_type specified).
+    The meshio_cell_type (if specified) must be according to the meshio library.
+    """
+    if isinstance(mesh_or_mesh_file, str):
+        mesh_or_mesh_file = meshio.read(mesh_or_mesh_file)
+    if isinstance(mesh_or_mesh_file, meshio.Mesh):
+        cs = mesh_or_mesh_file.points
+        cells = mesh_or_mesh_file.cells_dict
+        if meshio_cell_type is not None:
+            cells = cells[meshio_cell_type]
+    else:
+        import dolfin as df
+        if isinstance(mesh_or_mesh_file, df.Mesh):
+            cs = mesh_or_mesh_file.coordinates()
+            cells = mesh_or_mesh_file.cells()
+        else:
+            raise ValueError(f"The input mesh_or_mesh_file='{mesh_or_mesh_file}' is neither a mesh file nor a recognized mesh object.")
+    return cs, cells
+
+def _get_extended_mesh_data(points0, cells0 \
+                            , points_to_extend, cells_to_extend \
+                            , l, tol, direction='x'):
+    """
+    Crucial:
+        The node IDs referred to in "cells_to_extend" must be associated with the rows of 'points_to_extend'.
+    """
+    assert direction in ['x', 'y', 'z']
+    directions_IDs = {'x':0, 'y':1, 'z':2}
+    points_extended0 = points_to_extend.copy()
+    points_extended0[:, directions_IDs[direction]] += l
+    ids = find_among_points(points=points_extended0, points0=points0, tol=tol)
+    points_extended = points0.copy()
+    id_last_p = points_extended.shape[0] - 1
+    points_extended_IDs = dict()
+    for i, id in enumerate(ids):
+        if id is None: # a new extended point
+            points_extended = np.vstack((points_extended, points_extended0[i, :]))
+            points_extended_IDs[i] = id_last_p + 1
+            id_last_p += 1
+        else:
+            points_extended_IDs[i] = int(id)
+    cells_extended = np.empty_like(cells_to_extend)
+    for i,c in enumerate(cells_to_extend):
+        cells_extended[i,:] = [points_extended_IDs[j] for j in c]
+    cells_extended = np.concatenate((cells0, cells_extended), axis=0)
+    return points_extended, cells_extended
+
+def extend_mesh_periodically_meshio(mesh0_or_mesh0_file, mesh_file \
+                                    , meshio_cell_type, tol, n):
+    """
+    IMPORTANT:
+        Thie method does NOT care if the original mesh (mesh0_or_mesh0_file) is periodic!
+    
+    mesh0_or_mesh0_file: corresponds to the original mesh,
+        and is either a mesh file (supported by meshio) or a mesh object (of dolfin or meshio).
+    mesh_file: the full file name for the extended mesh to be stored (vie meshio).
+    tol: the tolerance for detecting duplicate nodes.
+    meshio_cell_type: the type of cells of the original mesh (according to meshio library)
+        For now it is working when there is only one meshio_cell_type.
+    n:
+        if integer: that many extensions are done at each spatial direction.
+        if tuple/list: respectively in directions 'x', 'y' and 'z'.
+        if dictionary:
+            keys are 'x' and/or 'y' and/or 'z',
+            values are integers, indication the number of extensions at respective direction
+    """
+    cs, cells = get_mesh_points_and_cells(mesh_or_mesh_file=mesh0_or_mesh0_file
+                                          , meshio_cell_type=meshio_cell_type)
+    directions_IDs = {'x':0, 'y':1, 'z':2}
+    
+    ls = dict()
+    for k, v in directions_IDs.items():
+        ls[k] = float(np.max(cs[:,v]) - np.min(cs[:,v]))
+    
+    if isinstance(n, int):
+        ns = {'x': n, 'y': n, 'z': n}
+    elif isinstance(n, list) or isinstance(n, tuple):
+        assert len(n)<=3
+        ns = dict()
+        for i, v in enumerate(n):
+            ns[['x', 'y', 'z'][i]] = v
+    else:
+        assert isinstance(n, dict)
+        ns = n
+    assert all([(k in ['x', 'y', 'z']) and isinstance(v, int) for k, v in ns.items()])
+    
+    for k, v in ns.items():
+        cs0 = cs.copy()
+        cells0 = cells.copy()
+        l = ls[k]
+        for i in range(v):
+            cs, cells = _get_extended_mesh_data(points0=cs, cells0=cells \
+                                                , points_to_extend=cs0, cells_to_extend=cells0 \
+                                                , l=i*l, tol=tol, direction=k)
+    meshio.write_points_cells(mesh_file, cs, {meshio_cell_type: cells})
+
 def extrude_triangled_mesh_by_meshio(ff_mesh_surface, ff_mesh_extruded, dz, res=1 \
                                      , node_collections={}, tol=None):
     """
