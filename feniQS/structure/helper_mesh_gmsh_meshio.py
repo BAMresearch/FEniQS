@@ -67,7 +67,7 @@ def _get_extended_mesh_data(points0, cells0 \
     return points_extended, cells_extended
 
 def extend_mesh_periodically_meshio(mesh0_or_mesh0_file, mesh_file \
-                                    , meshio_cell_type, tol, n \
+                                    , meshio_cell_type, n, tol=None \
                                     , translation=None):
     """
     IMPORTANT:
@@ -108,6 +108,11 @@ def extend_mesh_periodically_meshio(mesh0_or_mesh0_file, mesh_file \
         assert isinstance(n, dict)
         ns = n
     assert all([(k in ['x', 'y', 'z']) and isinstance(v, int) for k, v in ns.items()])
+    
+    if tol is None:
+        tol = max(max(cs[:,0]) - min(cs[:,0])
+                , max(cs[:,1]) - min(cs[:,1])
+                , max(cs[:,2]) - min(cs[:,2])) / cs.shape[0] / 1000.
     
     for k, v in ns.items():
         cs0 = cs.copy()
