@@ -67,7 +67,8 @@ def _get_extended_mesh_data(points0, cells0 \
     return points_extended, cells_extended
 
 def extend_mesh_periodically_meshio(mesh0_or_mesh0_file, mesh_file \
-                                    , meshio_cell_type, tol, n):
+                                    , meshio_cell_type, tol, n \
+                                    , translation=None):
     """
     IMPORTANT:
         Thie method does NOT care if the original mesh (mesh0_or_mesh0_file) is periodic!
@@ -84,6 +85,9 @@ def extend_mesh_periodically_meshio(mesh0_or_mesh0_file, mesh_file \
         if dictionary:
             keys are 'x' and/or 'y' and/or 'z',
             values are integers, indication the number of extensions at respective direction
+    translation:
+        if not None, must be a tuple/list/array of length 3, describing the translation
+        of the final extended mesh in three x,y,z directions.
     """
     cs, cells = get_mesh_points_and_cells(mesh_or_mesh_file=mesh0_or_mesh0_file
                                           , meshio_cell_type=meshio_cell_type)
@@ -113,7 +117,13 @@ def extend_mesh_periodically_meshio(mesh0_or_mesh0_file, mesh_file \
             cs, cells = _get_extended_mesh_data(points0=cs, cells0=cells \
                                                 , points_to_extend=cs0, cells_to_extend=cells0 \
                                                 , l=i*l, tol=tol, direction=k)
+    if translation is not None:
+        if len(translation)!=3:
+            raise ValueError(f"Specify the translation of the mesh as a tuple, list, or array with a length of 3.")
+        for i in range(3):
+            cs[:, i] += translation[i]
     meshio.write_points_cells(mesh_file, cs, {meshio_cell_type: cells})
+    return meshio.Mesh(points=cs, cells={meshio_cell_type: cells})
 
 def extrude_triangled_mesh_by_meshio(ff_mesh_surface, ff_mesh_extruded, dz, res=1 \
                                      , node_collections={}, tol=None):
