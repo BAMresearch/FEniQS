@@ -12,6 +12,75 @@ f: file (only file name + format)
 ff: full file (path + file name + format)
 """
 
+def get_meshQualityMetrics_triangular(mesh_file=None, points=None, cells=None \
+                                        , _path_plots=None, _name_plots='mesh_quality', _show_plot=True):
+    """
+    Inputs must contain either the 'mesh_file' (supported by meshio) or both of 'points' and 'cells'.
+    The mesh (or points/cells) must contain triangle elements.
+    """
+    if mesh_file is None:
+        if (points is None) or (cells is None):
+            raise ValueError(f"Specify either the mesh_file or both of points and cells.")
+        if points.shape[1]==2:
+            points = np.concatenate((points, np.zeros((points.shape[0], 1))), 1)
+        if cells.shape[1]!=0:
+            raise ValueError(f"The input cells do not represent triangles.")
+    else:
+        if points is not None:
+            print(f"WARNING (mesh quality metrics):\n\tThe input points were ignored (points were taken from mesh_file).")
+        if cells is not None:
+            print(f"WARNING (mesh quality metrics):\n\tThe input cells were ignored (cells were taken from mesh_file).")
+        _mesh = meshio.read(mesh_file)
+        points = _mesh.points
+        try:
+            cells = _mesh.cells_dict['triangle']
+        except KeyError:
+            raise ValueError(f"The input mesh_file has no triangle elements.")
+    tol = max(max(points[:,0]) - min(points[:,0])
+              , max(points[:,1]) - min(points[:,1])
+              , max(points[:,2]) - min(points[:,2])) / points.shape[0] / 1000.
+    qualities = {'aspect_ratio': [], 'min_angle': [], 'area': []}
+    for cc in cells:
+        p1, p2, p3 = points[cc[0]], points[cc[1]], points[cc[2]]
+        # Compute edge lengths
+        a = np.linalg.norm(p2 - p1)
+        b = np.linalg.norm(p3 - p2)
+        c = np.linalg.norm(p1 - p3)
+        # Avoid duplicate nodes
+        if min(a, b, c) < tol:
+            raise ValueError(f"Triangle {cc} has duplicate/coinciding nodes!")
+        # Aspect Ratio: (max edge length) / (min edge length)
+        aspect_ratio = max(a, b, c) / min(a, b, c)
+        # Compute angles
+        cos_alpha = (b**2 + c**2 - a**2) / (2 * b * c)
+        cos_beta  = (a**2 + c**2 - b**2) / (2 * a * c)
+        cos_gamma = (a**2 + b**2 - c**2) / (2 * a * b)
+        # Avoid precision issues with acos
+        angles = np.arccos(np.clip([cos_alpha, cos_beta, cos_gamma], -1.0, 1.0))
+        min_angle = np.degrees(np.min(angles))
+        # Compute area using Heron's formula
+        s = 0.5 * (a + b + c)
+        area = np.sqrt(s * (s - a) * (s - b) * (s - c))
+        qualities['aspect_ratio'].append(aspect_ratio)
+        qualities['min_angle'].append(min_angle)
+        qualities['area'].append(area)
+    if _path_plots is not None:
+        if not os.path.exists(_path_plots):
+            os.mkdir(_path_plots)
+        import matplotlib.pyplot as plt
+        for k in ['aspect_ratio', 'min_angle', 'area']:
+            aa = k.replace('_', ' ')
+            plt.figure()
+            plt.plot(qualities[k], linestyle='', marker='.')
+            plt.xlabel('Cell ID')
+            plt.ylabel(aa.capitalize())
+            plt.title(f"Mesh quality metric ({aa})")
+            plt.savefig(f"{_path_plots}{_name_plots}_{k}.png", bbox_inches='tight', dpi=500)
+            if _show_plot:
+                plt.show()
+            plt.close()
+    return qualities
+
 def get_mesh_points_and_cells(mesh_or_mesh_file, meshio_cell_type=None):
     """
     mesh_or_mesh_file:
