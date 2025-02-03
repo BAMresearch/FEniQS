@@ -149,7 +149,8 @@ def extend_mesh_periodically_meshio(mesh0_or_mesh0_file, mesh_file \
     meshio_cell_type: the type of cells of the original mesh (according to meshio library)
         For now it is working when there is only one meshio_cell_type.
     n:
-        if integer: that many extensions are done at each spatial direction.
+        if integer: that many copies of the input mesh at each spatial direction.
+            NOTE: n=1 implies no extension (1 copy) and returns the original mesh.
         if tuple/list: respectively in directions 'x', 'y' and 'z'.
         if dictionary:
             keys are 'x' and/or 'y' and/or 'z',
@@ -160,34 +161,41 @@ def extend_mesh_periodically_meshio(mesh0_or_mesh0_file, mesh_file \
     """
     cs, cells = get_mesh_points_and_cells(mesh_or_mesh_file=mesh0_or_mesh0_file
                                           , meshio_cell_type=meshio_cell_type)
+    c_dim = cs.shape[1]
     directions_IDs = {'x':0, 'y':1, 'z':2}
     
     ls = dict()
     for k, v in directions_IDs.items():
-        ls[k] = float(np.max(cs[:,v]) - np.min(cs[:,v]))
+        if v < c_dim:
+            ls[k] = float(np.max(cs[:,v]) - np.min(cs[:,v]))
     
     if isinstance(n, int):
-        ns = {'x': n, 'y': n, 'z': n}
+        ns = {k: n for k,v in directions_IDs.items() if v<c_dim}
     elif isinstance(n, list) or isinstance(n, tuple):
-        assert len(n)<=3
+        if len(n)>c_dim:
+            raise ValueError(f"The input n={n} is ambiguous, since its length exceeds the dimension of input mesh nodes (={c_dim}).")
         ns = dict()
         for i, v in enumerate(n):
             ns[['x', 'y', 'z'][i]] = v
     else:
         assert isinstance(n, dict)
+        assert all([k in ['x', 'y', 'z'] for k in n.keys()])
+        if len(n)>c_dim:
+            raise ValueError(f"The input n={n} is ambiguous, since its items do not match with the dimension of input mesh nodes (={c_dim}).")
         ns = n
-    assert all([(k in ['x', 'y', 'z']) and isinstance(v, int) for k, v in ns.items()])
+    assert all([isinstance(v, int) for v in ns.values()])
     
     if tol is None:
-        tol = max(max(cs[:,0]) - min(cs[:,0])
-                , max(cs[:,1]) - min(cs[:,1])
-                , max(cs[:,2]) - min(cs[:,2])) / cs.shape[0] / 1000.
+        tol = 0.
+        for l in ls.values():
+            tol = max(tol, l)
+        tol = tol / cs.shape[0] / 1000.
     
     for k, v in ns.items():
         cs0 = cs.copy()
         cells0 = cells.copy()
         l = ls[k]
-        for i in range(v):
+        for i in range(1, v):
             cs, cells = _get_extended_mesh_data(points0=cs, cells0=cells \
                                                 , points_to_extend=cs0, cells_to_extend=cells0 \
                                                 , l=i*l, tol=tol, direction=k)
