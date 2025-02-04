@@ -13,10 +13,13 @@ ff: full file (path + file name + format)
 """
 
 def get_meshQualityMetrics_triangular(mesh_file=None, points=None, cells=None \
-                                        , _path_plots=None, _name_plots='mesh_quality', _show_plot=True):
+                                    , _path_yaml=None, _name_yaml='mesh_quality' \
+                                    , _path_plots=None, _name_plots='mesh_quality', _show_plot=True):
     """
     Inputs must contain either the 'mesh_file' (supported by meshio) or both of 'points' and 'cells'.
     The mesh (or points/cells) must contain triangle elements.
+    _path_plots: If not None, the plots of mesh quality metrics will be stored.
+    _path_yaml: If not None, the mesh quality metrics will be stored in yaml files.
     """
     if mesh_file is None:
         if (points is None) or (cells is None):
@@ -30,6 +33,7 @@ def get_meshQualityMetrics_triangular(mesh_file=None, points=None, cells=None \
             print(f"WARNING (mesh quality metrics):\n\tThe input points were ignored (points were taken from mesh_file).")
         if cells is not None:
             print(f"WARNING (mesh quality metrics):\n\tThe input cells were ignored (cells were taken from mesh_file).")
+        import meshio
         _mesh = meshio.read(mesh_file)
         points = _mesh.points
         try:
@@ -64,10 +68,18 @@ def get_meshQualityMetrics_triangular(mesh_file=None, points=None, cells=None \
         qualities['aspect_ratio'].append(aspect_ratio)
         qualities['min_angle'].append(min_angle)
         qualities['area'].append(area)
+    if _path_yaml is not None:
+        import os, yaml
+        from feniQS.general.yaml_functions import yamlDump_array
+        if not os.path.exists(_path_yaml):
+            os.mkdir(_path_yaml)
+        for k, q in qualities.items():
+            yamlDump_array(np.array(q), f"{_path_yaml}{_name_yaml}_{k}.yaml")
     if _path_plots is not None:
+        import os
+        import matplotlib.pyplot as plt
         if not os.path.exists(_path_plots):
             os.mkdir(_path_plots)
-        import matplotlib.pyplot as plt
         for k in ['aspect_ratio', 'min_angle', 'area']:
             aa = k.replace('_', ' ')
             plt.figure()
