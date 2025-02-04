@@ -24,6 +24,30 @@ def one_cell_mesh_2D(x1, y1, x2, y2, x3, y3):
     editor.close()
     return mesh
 
+def L_shape_mesh(lx, ly, wx, wy, res_x, res_y
+                , embedded_nodes, el_size_min=None, el_size_max=None \
+                , _path='./', _name='lshape2D'):
+    ## Use Gmsh-API and meshio
+    ff_msh = gmshAPI_Lshape2D_mesh(lx=lx, ly=ly, wx=wx, wy=wy, res_x=res_x, res_y=res_y \
+                                 , embedded_nodes=embedded_nodes, el_size_min=el_size_min, el_size_max=el_size_max \
+                                , _path=_path, _name=_name)
+    ff_xdmf = get_xdmf_mesh_by_meshio(ff_msh, geo_dim=2, path_xdmf=_path)
+    mesh = df.Mesh()
+    with df.XDMFFile(ff_xdmf) as ff:
+        ff.read(mesh)
+    
+    ##### CRUCIAL #####
+    # We modify values of the given embedded_nodes to the exact nodal coordinates of the generated mesh.
+    # ---> Some veryyyy small deviation can emerge after calling methods 'gmshAPI_notched_rectangle_mesh'
+    #      and 'get_xdmf_mesh_by_meshio' and reading XDMF file to a FEniCS mesh.
+    #      Such deviation might cause issue: A given embedded node might get outside of the generated FEniCS mesh !
+    tol = mesh.rmin() / 1000.
+    for ie, ce in enumerate(embedded_nodes):
+        for cm in mesh.coordinates():
+            if np.linalg.norm(ce - cm) < tol:
+                embedded_nodes[ie, :] = cm[:]
+    
+    return mesh
 
 def bcc_mesh_parametric(r_strut, l_rve, n_rve, l_cell, add_plates=True, shape_name="bcc" \
              , _path='./', _name='parametric_bcc'):
