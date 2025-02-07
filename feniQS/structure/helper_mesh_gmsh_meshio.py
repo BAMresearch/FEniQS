@@ -12,6 +12,58 @@ f: file (only file name + format)
 ff: full file (path + file name + format)
 """
 
+def remove_isolated_nodes(cs, cells):
+    """
+    cs: mesh coordinates (np.array)
+    cells: cell connectivities (np.array)
+    This method removes potential nodes (among 'cs') that do not belong to any cell,
+    and returns nodes other than such nodes, plus the updated cell connectivities.
+    """
+    import numpy as np
+    node_IDs_original = [] # in all the cells
+    for c in cells:
+        node_IDs_original += list(c)
+    node_IDs_original_unique = list(set(node_IDs_original))
+    new_node_IDs_from_original_IDs = {int(_id): i for (i, _id) in enumerate(node_IDs_original_unique)}
+    unique_cs = cs[node_IDs_original_unique,:]
+    updated_cells = np.array([[new_node_IDs_from_original_IDs[ci] for ci in c] for c in cells])
+    return unique_cs, updated_cells
+
+def get_mesh_volume(mesh_or_mesh_file):
+    """
+    mesh_or_mesh_file:
+        either a mesh file (supported by meshio) or a mesh object (of dolfin or meshio).
+        It is preferred to input either a FEniCS mesh object, or an xdmf mesh file.
+    For 2D (planner) elements of a mesh, the method computes the total area of those elements.
+    """
+    import dolfin as df
+    def _get_dolfin_mesh_xdmf(file_xdmf):
+        _mesh = df.Mesh()
+        with df.XDMFFile(file_xdmf) as ff:
+            ff.read(_mesh)
+        return _mesh
+    def _get_dolfin_mesh_meshio(meshio_mesh):
+        import meshio, os
+        _tmp_file = './tmp_mesh.xdmf'
+        meshio.write(_tmp_file, meshio_mesh)
+        mesh = _get_dolfin_mesh_xdmf(_tmp_file)
+        os.remove(_tmp_file)
+    if isinstance(mesh_or_mesh_file, str):
+        if mesh_or_mesh_file.endswith('.xdmf'):
+            mesh = _get_dolfin_mesh_xdmf(mesh_or_mesh_file)
+        else:
+            import meshio
+            _m = meshio.read(mesh_or_mesh_file)
+            mesh = _get_dolfin_mesh_meshio(_m)
+    elif isinstance(mesh_or_mesh_file, meshio.Mesh):
+        mesh = _get_dolfin_mesh_meshio(mesh_or_mesh_file)
+    elif isinstance(mesh_or_mesh_file, df.Mesh):
+        mesh = mesh_or_mesh_file
+    else:
+        raise ValueError(f"The input mesh_or_mesh_file='{mesh_or_mesh_file}' is neither a mesh file nor a recognized mesh object.")
+    from feniQS.fenics_helpers.fenics_functions import get_element_volumes
+    return sum(get_element_volumes(mesh))
+
 def get_meshQualityMetrics_triangular(mesh_file=None, points=None, cells=None \
                                     , _path_yaml=None, _name_yaml='mesh_quality' \
                                     , _path_plots=None, _name_plots='mesh_quality', _show_plot=True):
