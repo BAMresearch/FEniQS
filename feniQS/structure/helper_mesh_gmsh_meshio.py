@@ -1,5 +1,4 @@
 import numpy as np
-import meshio
 import gmsh
 import os
 
@@ -37,13 +36,14 @@ def get_mesh_volume(mesh_or_mesh_file):
     For 2D (planner) elements of a mesh, the method computes the total area of those elements.
     """
     import dolfin as df
+    import meshio
     def _get_dolfin_mesh_xdmf(file_xdmf):
         _mesh = df.Mesh()
         with df.XDMFFile(file_xdmf) as ff:
             ff.read(_mesh)
         return _mesh
     def _get_dolfin_mesh_meshio(meshio_mesh):
-        import meshio, os
+        import os
         _tmp_file = './tmp_mesh.xdmf'
         meshio.write(_tmp_file, meshio_mesh)
         mesh = _get_dolfin_mesh_xdmf(_tmp_file)
@@ -53,7 +53,6 @@ def get_mesh_volume(mesh_or_mesh_file):
         if mesh_or_mesh_file.endswith('.xdmf'):
             mesh = _get_dolfin_mesh_xdmf(mesh_or_mesh_file)
         else:
-            import meshio
             _m = meshio.read(mesh_or_mesh_file)
             mesh = _get_dolfin_mesh_meshio(_m)
     elif isinstance(mesh_or_mesh_file, meshio.Mesh):
@@ -156,6 +155,7 @@ def get_mesh_points_and_cells(mesh_or_mesh_file, meshio_cell_type=None):
             or as a numpy array object (for the meshio_cell_type specified).
     The meshio_cell_type (if specified) must be according to the meshio library.
     """
+    import meshio
     if isinstance(mesh_or_mesh_file, str):
         mesh_or_mesh_file = meshio.read(mesh_or_mesh_file)
     if isinstance(mesh_or_mesh_file, meshio.Mesh):
@@ -269,6 +269,7 @@ def extend_mesh_periodically_meshio(mesh0_or_mesh0_file, mesh_file \
             raise ValueError(f"Specify the translation of the mesh as a tuple, list, or array with a length of 3.")
         for i in range(3):
             cs[:, i] += translation[i]
+    import meshio
     meshio.write_points_cells(mesh_file, cs, {meshio_cell_type: cells})
     return meshio.Mesh(points=cs, cells={meshio_cell_type: cells})
 
@@ -321,6 +322,7 @@ def extrude_triangled_mesh_by_meshio(ff_mesh_surface, ff_mesh_extruded, dz, res=
     This python method is based on the procedure of "Tetrahedral decomposition of triangular prism".
     Specifically, see Fig.4 of http://dx.doi.org/10.1145/1186822.1073239 (also attached here as picture).
     """
+    import meshio
     mesh = meshio.read(ff_mesh_surface)
     if any([c.type!='triangle' for c in mesh.cells]):
         raise ValueError(f"The input mesh must only contain triangle elements.")
@@ -417,6 +419,7 @@ def get_xdmf_mesh_by_meshio(ff_mesh, geo_dim, path_xdmf=None, _msg=True):
         - The name of the converted file is the same as the input file's.
         - The 'geo_dim' is required to remove unnecessary nodal coordinates (possibly the 'y' and/or 'z' coordinates).
     """
+    import meshio
     fn, fe = os.path.splitext(os.path.basename(ff_mesh))
     if fe == '.xdmf':
         if _msg:
