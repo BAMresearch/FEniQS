@@ -48,6 +48,7 @@ def get_mesh_volume(mesh_or_mesh_file):
         meshio.write(_tmp_file, meshio_mesh)
         mesh = _get_dolfin_mesh_xdmf(_tmp_file)
         os.remove(_tmp_file)
+        return mesh
     if isinstance(mesh_or_mesh_file, str):
         if mesh_or_mesh_file.endswith('.xdmf'):
             mesh = _get_dolfin_mesh_xdmf(mesh_or_mesh_file)
