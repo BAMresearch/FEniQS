@@ -20,14 +20,18 @@ def get_surface_mesh_from_volume_mesh(mesh_or_mesh_file, ff_mesh_surf=None):
     import meshio
     cs0, cells0 = get_mesh_points_and_cells(mesh_or_mesh_file=mesh_or_mesh_file \
                                             , meshio_cell_type='tetra')
-    triangles = []
+    triangles = dict()
     for c in cells0:
-        for t in [{c[0], c[1], c[2]}, {c[0], c[1], c[3]}, {c[0], c[2], c[3]}, {c[1], c[2], c[3]}]:
-            if t in triangles: # a duplicate triangle, thus, NOT belonging to surface mesh.
-                triangles.remove(t)
-            else:
-                triangles.append(t)
-    triangles = [list(t) for t in triangles]
+        for t in [[c[0], c[1], c[2]],
+                  [c[0], c[1], c[3]],
+                  [c[0], c[2], c[3]],
+                  [c[1], c[2], c[3]]]:
+            t = tuple(sorted(t))
+            try:
+                del triangles[t] # a duplicate triangle must NOT belong to surface mesh.
+            except KeyError:
+                triangles[t] = list(t)
+    triangles = [t for t in triangles.values()]
     cs, cells = remove_isolated_nodes(cs=cs0, cells=triangles)
     if ff_mesh_surf is not None:
         meshio.write_points_cells(filename=ff_mesh_surf, points=cs, cells={'triangle': cells})
