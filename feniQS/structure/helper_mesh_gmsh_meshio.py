@@ -57,8 +57,8 @@ def get_surface_mesh_from_volume_mesh(mesh_or_mesh_file, ff_mesh_surf=None):
 
 def remove_isolated_nodes(cs, cells):
     """
-    cs: mesh coordinates (np.array)
-    cells: cell connectivities (np.array)
+    cs: mesh coordinates (np.array) of a certain mesh
+    cells: cell connectivities (np.array) of the same mesh (consistent with cs)
     This method removes potential nodes (among 'cs') that do not belong to any cell,
     and returns nodes other than such nodes, plus the updated cell connectivities.
     """
@@ -71,6 +71,24 @@ def remove_isolated_nodes(cs, cells):
     unique_cs = cs[node_IDs_original_unique,:]
     updated_cells = np.array([[new_node_IDs_from_original_IDs[ci] for ci in c] for c in cells])
     return unique_cs, updated_cells
+
+def remove_missing_cells(cells, subset_cs_ids):
+    """
+    cells: cell connectivities (np.array) of a certain mesh.
+    subset_cs_ids: A subset of IDs among all the node IDs referred in cells
+        (the latter ranges from 0 to N).
+    This method removes cells with at-least one connectivity that is missing in subset_cs_ids,
+    and returns the updated cell connectivities.
+    """
+    subset_ids = {j: i for i, j in enumerate(subset_cs_ids)}
+    updated_cells = []
+    for c in cells:
+        try:
+            updated_cells.append([subset_ids[n] for n in c])
+        except KeyError:
+            pass
+    return np.array(updated_cells)
+
 
 def get_mesh_volume(mesh_or_mesh_file):
     """
