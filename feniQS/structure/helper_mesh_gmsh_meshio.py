@@ -11,6 +11,24 @@ f: file (only file name + format)
 ff: full file (path + file name + format)
 """
 
+def scale_mesh_meshio(mesh_or_mesh_file, scale: float \
+                    , ff_scaled_mesh: str = None, binary : bool = True \
+                    , centralize: bool = False):
+    import meshio
+    cs0, cells0 = get_mesh_points_and_cells(mesh_or_mesh_file=mesh_or_mesh_file)
+    if centralize:
+        for i in range(3):
+            c = 0.5 * (max(cs0[:,i]) + min(cs0[:,i]))
+            cs0[:,i] -= c
+    cs = scale * cs0
+    if ff_scaled_mesh is not None:
+        _dir = os.path.dirname(ff_scaled_mesh)
+        make_path(_dir)
+        meshio.write_points_cells(filename=ff_scaled_mesh \
+                                , points=cs, cells=cells0 \
+                                , binary=binary)
+    return meshio.Mesh(points=cs, cells=cells0)
+
 def get_surface_mesh_from_volume_mesh(mesh_or_mesh_file, ff_mesh_surf=None):
     """
     Creates/returns a surface mesh which contains ONLY and ALL triangles which by themselves belong to
