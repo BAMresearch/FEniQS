@@ -41,3 +41,11 @@ def yamlLoad_array(full_name):
         loaded = yaml.load(f, Loader=yaml.FullLoader)
     return np.array(loaded)
 
+def yamlDump_list_of_arrays(arrays_list, full_name):
+    with open(full_name, 'w') as f:
+        yaml.dump([a.tolist() for a in arrays_list], f)
+
+def yamlLoad_list_of_arrays(full_name):
+    with open(full_name) as f:
+        loaded = [np.array(arr) for arr in yaml.load(f, Loader=yaml.FullLoader)]
+    return loaded
