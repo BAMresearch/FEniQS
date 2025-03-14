@@ -89,6 +89,30 @@ def remove_missing_cells(cells, subset_cs_ids):
             pass
     return np.array(updated_cells)
 
+def extract_a_sub_mesh(mesh0_or_mesh0_file, meshio_cell_type \
+                     , sub_mesh_cs_ids=None, callable_is_a_point_in_sub_mesh=None \
+                     , ff_sub_mesh: str = None):
+    cs0, cells0 = get_mesh_points_and_cells(mesh_or_mesh_file=mesh0_or_mesh0_file \
+                                            , meshio_cell_type=meshio_cell_type)
+    if sub_mesh_cs_ids is None:
+        if callable_is_a_point_in_sub_mesh is None:
+            raise ValueError("At least one of 'sub_mesh_cs_ids' and 'callable_is_a_point_in_sub_mesh' must be not None.")
+        else:
+            assert callable(callable_is_a_point_in_sub_mesh)
+            sub_mesh_cs_ids = [i for i, c in enumerate(cs0) if callable_is_a_point_in_sub_mesh(c)]
+    else:
+        assert isinstance(sub_mesh_cs_ids, list)
+    sub_mesh_cells = remove_missing_cells(cells=cells0, subset_cs_ids=sub_mesh_cs_ids)
+    sub_mesh_cs = cs0[sub_mesh_cs_ids, :]
+    sub_mesh_cs_unique, sub_mesh_cells_unique = remove_isolated_nodes(
+        cs=sub_mesh_cs, cells=sub_mesh_cells)
+    import meshio
+    if ff_sub_mesh is not None:
+        _dir = os.path.dirname(ff_sub_mesh)
+        make_path(_dir)
+        meshio.write_points_cells(filename=ff_sub_mesh, points=sub_mesh_cs_unique \
+                                  , cells={meshio_cell_type: sub_mesh_cells_unique})
+    return meshio.Mesh(points=sub_mesh_cs_unique, cells={meshio_cell_type: sub_mesh_cells_unique})
 
 def get_mesh_volume(mesh_or_mesh_file):
     """
