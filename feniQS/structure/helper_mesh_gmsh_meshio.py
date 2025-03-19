@@ -114,13 +114,7 @@ def extract_a_sub_mesh(mesh0_or_mesh0_file, meshio_cell_type \
                                   , cells={meshio_cell_type: sub_mesh_cells_unique})
     return meshio.Mesh(points=sub_mesh_cs_unique, cells={meshio_cell_type: sub_mesh_cells_unique})
 
-def get_mesh_volume(mesh_or_mesh_file):
-    """
-    mesh_or_mesh_file:
-        either a mesh file (supported by meshio) or a mesh object (of dolfin or meshio).
-        It is preferred to input either a FEniCS mesh object, or an xdmf mesh file.
-    For 2D (planner) elements of a mesh, the method computes the total area of those elements.
-    """
+def get_fenics_mesh_object(mesh_or_mesh_file):
     import dolfin as df
     import meshio
     def _get_dolfin_mesh_xdmf(file_xdmf):
@@ -132,9 +126,9 @@ def get_mesh_volume(mesh_or_mesh_file):
         import os
         _tmp_file = './tmp_mesh.xdmf'
         meshio.write(_tmp_file, meshio_mesh)
-        mesh = _get_dolfin_mesh_xdmf(_tmp_file)
+        _mesh = _get_dolfin_mesh_xdmf(_tmp_file)
         os.remove(_tmp_file)
-        return mesh
+        return _mesh
     if isinstance(mesh_or_mesh_file, str):
         if mesh_or_mesh_file.endswith('.xdmf'):
             mesh = _get_dolfin_mesh_xdmf(mesh_or_mesh_file)
@@ -147,6 +141,35 @@ def get_mesh_volume(mesh_or_mesh_file):
         mesh = mesh_or_mesh_file
     else:
         raise ValueError(f"The input mesh_or_mesh_file='{mesh_or_mesh_file}' is neither a mesh file nor a recognized mesh object.")
+    return mesh
+
+def get_mesh_statistics(mesh_or_mesh_file):
+    mesh = get_fenics_mesh_object(mesh_or_mesh_file=mesh_or_mesh_file)
+    from feniQS.fenics_helpers.fenics_functions import get_element_volumes
+    import numpy as np
+    element_volumes = get_element_volumes(mesh)
+    return {
+        'volume_full': float(np.sum(element_volumes)),
+        'volume_cell_mean': float(np.mean(element_volumes)),
+        'volume_cell_min': float(np.min(element_volumes)),
+        'volume_cell_max': float(np.max(element_volumes)),
+        'num_nodes': mesh.num_vertices(),
+        'num_cells': mesh.num_cells(),
+        'num_edges': mesh.num_edges(),
+        'num_faces': mesh.num_faces(),
+        'num_facets': mesh.num_facets(),
+        'r_min': mesh.rmin(),
+        'r_max': mesh.rmax(),
+    }
+
+def get_mesh_volume(mesh_or_mesh_file):
+    """
+    mesh_or_mesh_file:
+        either a mesh file (supported by meshio) or a mesh object (of dolfin or meshio).
+        It is preferred to input either a FEniCS mesh object, or an xdmf mesh file.
+    For 2D (planner) elements of a mesh, the method computes the total area of those elements.
+    """
+    mesh = get_fenics_mesh_object(mesh_or_mesh_file=mesh_or_mesh_file)
     from feniQS.fenics_helpers.fenics_functions import get_element_volumes
     return sum(get_element_volumes(mesh))
 
