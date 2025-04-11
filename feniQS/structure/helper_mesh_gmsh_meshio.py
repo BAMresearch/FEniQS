@@ -337,6 +337,8 @@ def extend_mesh_periodically_meshio(mesh0_or_mesh0_file, mesh_file \
                                           , meshio_cell_type=meshio_cell_type)
     c_dim = cs.shape[1]
     directions_IDs = {'x':0, 'y':1, 'z':2}
+    cs_RVE0 = cs + 0. # deepcopy
+    RVE_node_IDs = {'000': list(range(cs_RVE0.shape[0]))}
     
     ls = dict()
     for k, v in directions_IDs.items():
@@ -373,14 +375,51 @@ def extend_mesh_periodically_meshio(mesh0_or_mesh0_file, mesh_file \
             cs, cells = _get_extended_mesh_data(points0=cs, cells0=cells \
                                                 , points_to_extend=cs0, cells_to_extend=cells0 \
                                                 , l=i*l, tol=tol, direction=k)
+    
+    ## The following part extracts the node IDs per each extended RVE,
+    # and is for now working only when the extension is in all 3 directions (for a 3D RVE).
+    RVE_i = 0
+    RVE_nodes_labels = np.zeros(cs.shape[0], dtype=int)
+    RVE_nodes_labels[RVE_node_IDs['000']] = RVE_i # The labels have to be numbers (string is not possible).
+    for i_x in range(ns['x']):
+        x1 = np.min(cs[:,0]) + i_x * ls['x']
+        x2 = np.min(cs[:,0]) + (i_x + 1) * ls['x']
+        _where_x = np.logical_and(x1-tol<cs[:,0], cs[:,0]<x2+tol)
+        for i_y in range(ns['y']):
+            y1 = np.min(cs[:,1]) + i_y * ls['y']
+            y2 = np.min(cs[:,1]) + (i_y + 1) * ls['y']
+            _where_y = np.logical_and(y1-tol<cs[:,1], cs[:,1]<y2+tol)
+            _where_xy = np.logical_and(_where_x, _where_y)
+            for i_z in range(ns['z']):
+                if not (i_x==0 and i_y==0 and i_z==0):
+                    RVE_i += 1
+                    z1 = np.min(cs[:,2]) + i_z * ls['z']
+                    z2 = np.min(cs[:,2]) + (i_z + 1) * ls['z']
+                    _where_z = np.logical_and(z1-tol<cs[:,2], cs[:,2]<z2+tol)
+                    _where = np.logical_and(_where_xy, _where_z)
+                    _where_IDs = np.where(_where)[0]
+                    _cs_RVE = cs[_where, :]
+                    _cs_RVE[:, 0] -= i_x * ls['x']
+                    _cs_RVE[:, 1] -= i_y * ls['y']
+                    _cs_RVE[:, 2] -= i_z * ls['z']
+                    _ids = find_among_points(points=cs_RVE0, points0=_cs_RVE, tol=tol)
+                    rve_label = f"{i_x}{i_y}{i_z}"
+                    RVE_node_IDs[rve_label] = [int(_where_IDs[_i]) for _i in _ids]
+                    RVE_nodes_labels[RVE_node_IDs[rve_label]] = int(RVE_i * (-1) ** (sum(int(d) for d in rve_label)))
+                        # The labels have to be numbers (string is not possible).
+    point_data = {'RVE_nodes': RVE_nodes_labels}
+
     if translation is not None:
         if len(translation)!=3:
             raise ValueError(f"Specify the translation of the mesh as a tuple, list, or array with a length of 3.")
         for i in range(3):
             cs[:, i] += translation[i]
     import meshio
-    meshio.write_points_cells(mesh_file, cs, {meshio_cell_type: cells})
-    return meshio.Mesh(points=cs, cells={meshio_cell_type: cells})
+    meshio.write_points_cells(mesh_file, cs, {meshio_cell_type: cells}
+                              , point_data=point_data)
+    mesh_meshio = meshio.Mesh(points=cs, cells={meshio_cell_type: cells}
+                              , point_data=point_data)
+    return mesh_meshio, RVE_node_IDs
 
 def extrude_triangled_mesh_by_meshio(ff_mesh_surface, ff_mesh_extruded, dz, res=1 \
                                      , node_collections={}, tol=None):
