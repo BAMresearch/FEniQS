@@ -50,7 +50,7 @@ def get_surface_mesh_from_volume_mesh(mesh_or_mesh_file, ff_mesh_surf=None):
             except KeyError:
                 triangles[t] = list(t)
     triangles = [t for t in triangles.values()]
-    cs, cells = remove_isolated_nodes(cs=cs0, cells=triangles)
+    cs, cells, _ = remove_isolated_nodes(cs=cs0, cells=triangles)
     if ff_mesh_surf is not None:
         meshio.write_points_cells(filename=ff_mesh_surf, points=cs, cells={'triangle': cells})
     return meshio.Mesh(points=cs, cells={'triangle': cells})
@@ -60,17 +60,18 @@ def remove_isolated_nodes(cs, cells):
     cs: mesh coordinates (np.array) of a certain mesh
     cells: cell connectivities (np.array) of the same mesh (consistent with cs)
     This method removes potential nodes (among 'cs') that do not belong to any cell,
-    and returns nodes other than such nodes, plus the updated cell connectivities.
+    and returns unique nodes other than such nodes, the updated cell connectivities, plus
+    the IDs of those unique (non-isolated) nodes at the original 'cs'.
     """
     import numpy as np
     node_IDs_original = [] # in all the cells
     for c in cells:
         node_IDs_original += list(c)
-    node_IDs_original_unique = list(set(node_IDs_original))
-    new_node_IDs_from_original_IDs = {int(_id): i for (i, _id) in enumerate(node_IDs_original_unique)}
-    unique_cs = cs[node_IDs_original_unique,:]
+    unique_cs_IDs_original = list(set(node_IDs_original))
+    new_node_IDs_from_original_IDs = {int(_id): i for (i, _id) in enumerate(unique_cs_IDs_original)}
+    unique_cs = cs[unique_cs_IDs_original,:]
     updated_cells = np.array([[new_node_IDs_from_original_IDs[ci] for ci in c] for c in cells])
-    return unique_cs, updated_cells
+    return unique_cs, updated_cells, unique_cs_IDs_original
 
 def remove_missing_cells(cells, subset_cs_ids):
     """
@@ -104,7 +105,7 @@ def extract_a_sub_mesh(mesh0_or_mesh0_file, meshio_cell_type \
         assert isinstance(sub_mesh_cs_ids, list)
     sub_mesh_cells = remove_missing_cells(cells=cells0, subset_cs_ids=sub_mesh_cs_ids)
     sub_mesh_cs = cs0[sub_mesh_cs_ids, :]
-    sub_mesh_cs_unique, sub_mesh_cells_unique = remove_isolated_nodes(
+    sub_mesh_cs_unique, sub_mesh_cells_unique, unique_cs_IDs_original = remove_isolated_nodes(
         cs=sub_mesh_cs, cells=sub_mesh_cells)
     import meshio
     if ff_sub_mesh is not None:
@@ -112,7 +113,7 @@ def extract_a_sub_mesh(mesh0_or_mesh0_file, meshio_cell_type \
         make_path(_dir)
         meshio.write_points_cells(filename=ff_sub_mesh, points=sub_mesh_cs_unique \
                                   , cells={meshio_cell_type: sub_mesh_cells_unique})
-    return meshio.Mesh(points=sub_mesh_cs_unique, cells={meshio_cell_type: sub_mesh_cells_unique})
+    return meshio.Mesh(points=sub_mesh_cs_unique, cells={meshio_cell_type: sub_mesh_cells_unique}), unique_cs_IDs_original
 
 def get_fenics_mesh_object(mesh_or_mesh_file):
     import dolfin as df
