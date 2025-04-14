@@ -119,7 +119,7 @@ def extract_a_sub_mesh(mesh0_or_mesh0_file, meshio_cell_type \
                 try:
                     sub_mesh_node_groups[k].append(_new_node_IDs_from_original_IDs[vi])
                 except KeyError:
-                    pass
+                    sub_mesh_node_groups[k].append(None) # To keep a one-to-one correspondance
     import meshio
     if ff_sub_mesh is not None:
         _dir = os.path.dirname(ff_sub_mesh)
