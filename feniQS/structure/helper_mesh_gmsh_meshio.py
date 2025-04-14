@@ -92,7 +92,7 @@ def remove_missing_cells(cells, subset_cs_ids):
 
 def extract_a_sub_mesh(mesh0_or_mesh0_file, meshio_cell_type \
                      , sub_mesh_cs_ids=None, callable_is_a_point_in_sub_mesh=None \
-                     , ff_sub_mesh: str = None):
+                     , ff_sub_mesh: str = None, mesh0_node_groups: dict = None):
     cs0, cells0 = get_mesh_points_and_cells(mesh_or_mesh_file=mesh0_or_mesh0_file \
                                             , meshio_cell_type=meshio_cell_type)
     if sub_mesh_cs_ids is None:
@@ -108,6 +108,15 @@ def extract_a_sub_mesh(mesh0_or_mesh0_file, meshio_cell_type \
     sub_mesh_cs_unique, sub_mesh_cells_unique, unique_cs_IDs_original = remove_isolated_nodes(
         cs=sub_mesh_cs, cells=sub_mesh_cells)
     sub_mesh_unique_cs_IDs_at_mesh0 = [sub_mesh_cs_ids[_i] for _i in unique_cs_IDs_original]
+    _new_node_IDs_from_original_IDs = {int(_id): i for (i, _id) in enumerate(sub_mesh_unique_cs_IDs_at_mesh0)}
+    sub_mesh_node_groups = dict() # The node IDs will be based on the nodes of sub_mesh itself.
+    for k, v in mesh0_node_groups.items():
+        sub_mesh_node_groups[k] = []
+        for vi in v:
+            try:
+                sub_mesh_node_groups[k].append(_new_node_IDs_from_original_IDs[vi])
+            except KeyError:
+                pass
     import meshio
     if ff_sub_mesh is not None:
         _dir = os.path.dirname(ff_sub_mesh)
@@ -115,7 +124,7 @@ def extract_a_sub_mesh(mesh0_or_mesh0_file, meshio_cell_type \
         meshio.write_points_cells(filename=ff_sub_mesh, points=sub_mesh_cs_unique \
                                   , cells={meshio_cell_type: sub_mesh_cells_unique})
     return meshio.Mesh(points=sub_mesh_cs_unique, cells={meshio_cell_type: sub_mesh_cells_unique}) \
-        , sub_mesh_unique_cs_IDs_at_mesh0
+        , sub_mesh_unique_cs_IDs_at_mesh0, sub_mesh_node_groups
 
 def get_fenics_mesh_object(mesh_or_mesh_file):
     import dolfin as df
