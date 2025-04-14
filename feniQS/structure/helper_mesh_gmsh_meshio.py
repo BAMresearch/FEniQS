@@ -107,13 +107,15 @@ def extract_a_sub_mesh(mesh0_or_mesh0_file, meshio_cell_type \
     sub_mesh_cs = cs0[sub_mesh_cs_ids, :]
     sub_mesh_cs_unique, sub_mesh_cells_unique, unique_cs_IDs_original = remove_isolated_nodes(
         cs=sub_mesh_cs, cells=sub_mesh_cells)
+    sub_mesh_unique_cs_IDs_at_mesh0 = [sub_mesh_cs_ids[_i] for _i in unique_cs_IDs_original]
     import meshio
     if ff_sub_mesh is not None:
         _dir = os.path.dirname(ff_sub_mesh)
         make_path(_dir)
         meshio.write_points_cells(filename=ff_sub_mesh, points=sub_mesh_cs_unique \
                                   , cells={meshio_cell_type: sub_mesh_cells_unique})
-    return meshio.Mesh(points=sub_mesh_cs_unique, cells={meshio_cell_type: sub_mesh_cells_unique}), unique_cs_IDs_original
+    return meshio.Mesh(points=sub_mesh_cs_unique, cells={meshio_cell_type: sub_mesh_cells_unique}) \
+        , sub_mesh_unique_cs_IDs_at_mesh0
 
 def get_fenics_mesh_object(mesh_or_mesh_file):
     import dolfin as df
