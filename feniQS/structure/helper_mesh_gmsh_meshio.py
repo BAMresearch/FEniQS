@@ -109,14 +109,17 @@ def extract_a_sub_mesh(mesh0_or_mesh0_file, meshio_cell_type \
         cs=sub_mesh_cs, cells=sub_mesh_cells)
     sub_mesh_unique_cs_IDs_at_mesh0 = [sub_mesh_cs_ids[_i] for _i in unique_cs_IDs_original]
     _new_node_IDs_from_original_IDs = {int(_id): i for (i, _id) in enumerate(sub_mesh_unique_cs_IDs_at_mesh0)}
-    sub_mesh_node_groups = dict() # The node IDs will be based on the nodes of sub_mesh itself.
-    for k, v in mesh0_node_groups.items():
-        sub_mesh_node_groups[k] = []
-        for vi in v:
-            try:
-                sub_mesh_node_groups[k].append(_new_node_IDs_from_original_IDs[vi])
-            except KeyError:
-                pass
+    if mesh0_node_groups is None:
+        sub_mesh_node_groups = None
+    else:
+        sub_mesh_node_groups = dict() # The node IDs will be based on the nodes of sub_mesh itself.
+        for k, v in mesh0_node_groups.items():
+            sub_mesh_node_groups[k] = []
+            for vi in v:
+                try:
+                    sub_mesh_node_groups[k].append(_new_node_IDs_from_original_IDs[vi])
+                except KeyError:
+                    pass
     import meshio
     if ff_sub_mesh is not None:
         _dir = os.path.dirname(ff_sub_mesh)
