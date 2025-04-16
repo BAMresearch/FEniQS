@@ -107,12 +107,8 @@ def are_points_in_mesh(mesh, points):
     return existing_points_ids, missing_points_ids
 
 def is_point_in_mesh(mesh, point):
-    _is = False; ic = 0
-    while (not _is) and ic < mesh.num_cells():
-        c = df.Cell(mesh, ic)
-        _is = (c.collides(df.Point(point)) or c.contains(df.Point(point)))
-        ic += 1
-    return _is
+    aa = mesh.bounding_box_tree().compute_first_entity_collision(df.Point(point))
+    return 0 <= aa < mesh.num_cells()
 
 def interpolate_data_of_meshPoints(mesh_of_data, data_at_mesh_points, eval_points \
                                    , el_family='CG', deg=1):
