@@ -140,6 +140,27 @@ class TimeVaryingExpressionFromPython(df.UserExpression):
     def value_shape(self):
         return ()
 
+class MeshMaskExpression(df.UserExpression):
+    """
+    Given a mesh, the value of this fenics expression at any point is either of:
+        1 , if the point is inside the mesh (including boundaries),
+        0 , otherwise.
+    For meshes with complicated boundaries, a higher interpolation degree (>=2) is recommended.
+    """
+    def __init__(self, mesh, degree=2, **kwargs):
+        super().__init__(degree=degree, **kwargs)
+        self._mesh = mesh
+        self._tree = self._mesh.bounding_box_tree()
+        self._num_cells = self._mesh.num_cells()
+    def eval(self, value, x):
+        aa = self._tree.compute_first_entity_collision(df.Point(x))
+        if 0 <= aa < self._num_cells:
+            value[0] = 1
+        else:
+            value[0] = 0
+    def value_shape(self):
+        return ()
+
 def plot_expression_of_t(expr, t0, t_end, ts=None, _res=1000, lab_x='t', lab_y='u', sz=14, _tit='Plot'\
                     , _save=True, _path='./', _name='plot', _format='.png', marker='' , linestyle='-', _show_plot=True):
     import matplotlib.pyplot as plt
