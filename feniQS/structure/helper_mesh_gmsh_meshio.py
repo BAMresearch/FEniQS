@@ -177,7 +177,7 @@ def get_mesh_statistics(mesh_or_mesh_file):
         'r_max': mesh.rmax(),
     }
 
-def get_mesh_volume(mesh_or_mesh_file):
+def get_mesh_volume(mesh_or_mesh_file, sum_over_cells=True):
     """
     mesh_or_mesh_file:
         either a mesh file (supported by meshio) or a mesh object (of dolfin or meshio).
@@ -185,8 +185,12 @@ def get_mesh_volume(mesh_or_mesh_file):
     For 2D (planner) elements of a mesh, the method computes the total area of those elements.
     """
     mesh = get_fenics_mesh_object(mesh_or_mesh_file=mesh_or_mesh_file)
-    from feniQS.fenics_helpers.fenics_functions import get_element_volumes
-    return sum(get_element_volumes(mesh))
+    if sum_over_cells:
+        from feniQS.fenics_helpers.fenics_functions import get_element_volumes
+        return sum(get_element_volumes(mesh))
+    else:
+        import dolfin as df
+        return df.assemble(1. * df.dx(mesh))
 
 def get_meshQualityMetrics_triangular(mesh_file=None, points=None, cells=None \
                                     , _path_yaml=None, _name_yaml='mesh_quality' \
@@ -533,8 +537,11 @@ def extrude_triangled_mesh_by_meshio(ff_mesh_surface, ff_mesh_extruded, dz, res=
     if not all([len(dz_i)==num_sides for dz_i in dzs]):
         raise ValueError("Extrusion must be applied to one or double sides for all nodes.")
     
+    extruded_ids = dict()
+        # The keys of 'extruded_ids' refer to the node IDs of the input 'ff_mesh_surface'
+        # , which also are exactly the node IDs of the first 'n_ps' nodes in 'ps_3d'.
     for i, dz_i in enumerate(dzs):
-        extruded_ids = []
+        extruded_ids[i] = []
         for i_side, dz_side in enumerate(dz_i):
             for iz in range(1, res[i_side]+1):
                 shift = shift_nodes_side[i_side] + iz * n_ps
@@ -543,10 +550,10 @@ def extrude_triangled_mesh_by_meshio(ff_mesh_surface, ff_mesh_extruded, dz, res=
                     ps_3d[i+shift, 2] = iz*dz_side/res[i_side]
                 else:
                     ps_3d[i+shift,:] = ps3[i,:] + iz*dz_side/res[i_side]
-                extruded_ids.append(i+shift)
+                extruded_ids[i].append(i+shift)
         for k in extruded_node_collections_IDs.keys():
             if i in extruded_node_collections_IDs[k]:
-                extruded_node_collections_IDs[k] += extruded_ids
+                extruded_node_collections_IDs[k] += extruded_ids[i]
     mesh.points = ps_3d
     mesh.cells[0].type = 'tetra'
     mesh.cells[0].dim = 3
@@ -554,6 +561,7 @@ def extrude_triangled_mesh_by_meshio(ff_mesh_surface, ff_mesh_extruded, dz, res=
     
     mesh_2d_cell_data = mesh.cells[0].data
     n_cells_2d = mesh_2d_cell_data.shape[0]
+    extruded_cells_ids = {i: [] for i in range(n_cells_2d)}
     mesh.cells[0].data = np.empty((res_total*n_cells_2d*3, 4), dtype=np.int32)
     shift_cells_side = [0, res[0]*n_cells_2d*3]
     for i_side in range(num_sides):
@@ -568,9 +576,10 @@ def extrude_triangled_mesh_by_meshio(ff_mesh_surface, ff_mesh_extruded, dz, res=
                 mesh.cells[0].data[i0, :] = [aa[0], aa[1], aa[2], aa[2]+n_ps+cc]
                 mesh.cells[0].data[i0+1, :] = [aa[0], aa[1], aa[2]+n_ps+cc, aa[1]+n_ps+cc]
                 mesh.cells[0].data[i0+2, :] = [aa[0], aa[0]+n_ps+cc, aa[1]+n_ps+cc, aa[2]+n_ps+cc]
+                extruded_cells_ids[i].extend([i0, i0+1, i0+2])
     
     meshio.write(ff_mesh_extruded, mesh)
-    return extruded_node_collections
+    return extruded_node_collections, extruded_ids, extruded_cells_ids
 
 def get_xdmf_mesh_by_meshio(ff_mesh, geo_dim, path_xdmf=None, _msg=True):
     """
