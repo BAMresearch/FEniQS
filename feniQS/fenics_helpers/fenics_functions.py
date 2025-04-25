@@ -530,7 +530,6 @@ class ValuesEvolverInTime:
                         val_t = a * np.array(self.values[i+1]) + b * np.array(self.values[i])
                         break
             self.assigner(val_t)
-    
 
 class LocalProjector:
     def __init__(self, expr, V, dxm):
@@ -566,6 +565,47 @@ class LocalProjector:
             assert isinstance(u, df.Function)
             self.solver.solve_local_rhs(u)
 
+class IntegralMeasureOverCells:
+    """
+    With 'integrator' being defined as an instance of this class,
+    'integrator.dx' refers to an integral measure over only those
+    cells of 'integrator.mesh' that are specified by
+    'integrator.active_cells_IDs'.
+    The active cells (their IDs) can be set via the method
+    'integrator.set_active_cells'.
+    """
+    def __init__(self, mesh, active_cells_IDs=None, integ_degree=1, _tag=1):
+        self.mesh = mesh
+        self._max_cell_id = self.mesh.num_cells() - 1
+        self._tag = _tag # for active cells
+        self.active_cells_IDs = [] if active_cells_IDs is None else active_cells_IDs
+        self._cell_tags = df.MeshFunction("size_t", mesh, mesh.topology().dim(), 0)
+        self._update_tags()
+        _md = {'quadrature_degree': integ_degree, 'quadrature_scheme': 'default'}
+        self._measure = df.Measure("dx", domain=mesh
+                                   , subdomain_data=self._cell_tags
+                                   , metadata=_md)
+
+    def set_active_cells(self, cell_ids):
+        if len(cell_ids)>0:
+            min_idx = min(cell_ids)
+            max_idx = max(cell_ids)
+            if min_idx < 0 or max_idx > self._max_cell_id:
+                raise ValueError("Invalid cell indices: some are out of bounds.")
+        self.active_cells_IDs = cell_ids
+        self._update_tags()
+    
+    def activate_all_cells(self):
+        self._cell_tags.set_all(self._tag)
+
+    def _update_tags(self):
+        self._cell_tags.set_all(0)
+        for idx in self.active_cells_IDs:
+            self._cell_tags[idx] = self._tag
+
+    @property
+    def dx(self):
+        return self._measure(self._tag)
 
 def compute_residual(F, bcs_dofs, reaction_dofs=[], logger=None, u_sol=None, u_F=None, write_residual_vector=False):
     """
