@@ -310,7 +310,7 @@ def interANDextrapolation_with_weightedLS(points, values, new_points, function='
             vals.append(values[idx])
             continue # No need to fit (found an exact match)
         ws = weight_function(pn)
-        sigma = np.reciprocal(ws ** 2, where=ws != 0)
+        sigma = np.reciprocal(ws ** 0.5, where=ws != 0)
         popt_list = []
         for jj in range(lv):
             _val = values[:, jj]
