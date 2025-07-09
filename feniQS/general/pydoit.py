@@ -46,7 +46,9 @@ class DoitTaskManager:
         return [[True] for i in range(nst)]
 
 
-def run_pydoit_task(tasks, basename, verbosity=2, reset_dep=False):
+def run_pydoit_task(tasks, basename
+                    , verbosity=2, reset_dep=False
+                    , dep_file=None):
     """
     Source:
         https://pydoit.org/extending.html#example-pre-defined-task
@@ -59,8 +61,8 @@ def run_pydoit_task(tasks, basename, verbosity=2, reset_dep=False):
             t = task.get_task_dict()
         elif callable(task):
             t = task()
-        else:
-            t = task
+        else: # is a dictionary
+            t = {k:v for k,v in task.items()} # Much safer to get copy/reference (due to possible change of task names)
         if not (isinstance(t, list) or isinstance(t, types.GeneratorType)):
             t = [t]
         return t
@@ -71,7 +73,10 @@ def run_pydoit_task(tasks, basename, verbosity=2, reset_dep=False):
         def setup(self, opt_values):
             pass
         def load_doit_config(self):
-            return {'verbosity': verbosity,}
+            conf = {'verbosity': verbosity}
+            if dep_file is not None:
+                conf['dep_file'] = dep_file
+            return conf
         def load_tasks(self, cmd, pos_args):
             task_list = []
             for task in tasks: # by itself can have subtasks or a single task
