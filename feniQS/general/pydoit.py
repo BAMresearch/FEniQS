@@ -1,3 +1,6 @@
+import os
+
+
 class DoitTaskManager:
     """
     A base class for handling pydo stuff.
@@ -75,6 +78,10 @@ def run_pydoit_task(tasks, basename
         def load_doit_config(self):
             conf = {'verbosity': verbosity}
             if dep_file is not None:
+                import os
+                _path = os.path.dirname(dep_file)
+                if not os.path.exists(_path):
+                    os.makedirs(_path)
                 conf['dep_file'] = dep_file
             return conf
         def load_tasks(self, cmd, pos_args):
