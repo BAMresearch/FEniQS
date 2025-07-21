@@ -3,11 +3,11 @@ from feniQS.fenics_helpers.fenics_functions import *
 from feniQS.structure.helper_loadings import *
 from feniQS.structure.helper_BCs import *
 
-pth_struct_rectangle2d = CollectPaths('./feniQS/structure/struct_rectangle2D.py')
-pth_struct_rectangle2d.add_script(pth_structures_fenics)
-pth_struct_rectangle2d.add_script(pth_fenics_functions)
-pth_struct_rectangle2d.add_script(pth_helper_loadings)
-pth_struct_rectangle2d.add_script(pth_helper_BCs)
+pth_struct_cantbeam = CollectPaths('./feniQS/structure/struct_cantilever_beam.py')
+pth_struct_cantbeam.add_script(pth_structures_fenics)
+pth_struct_cantbeam.add_script(pth_fenics_functions)
+pth_struct_cantbeam.add_script(pth_helper_loadings)
+pth_struct_cantbeam.add_script(pth_helper_BCs)
 
 class ParsCantileverBeam2D(ParsBase):
     def __init__(self, **kwargs):
