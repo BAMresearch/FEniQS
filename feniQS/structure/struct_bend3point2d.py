@@ -81,10 +81,10 @@ class ParsBend3Point2D(ParsBase):
         x, y = p[0], p[1]
         if include_edges:
             return x>=0.0 and x<=pars.lx and y>=0.0 and y<=pars.ly \
-                and not(x>(pars.lx-pars.l_notch)/2 and x<(pars.lx+pars.l_notch)/2 and y>=0.0 and y<pars.h_notch)
+                and not(x>pars.left_notch and x<(pars.left_notch+pars.l_notch) and y>=0.0 and y<pars.h_notch)
         else:
             return x>0.0 and x<pars.lx and y>0.0 and y<pars.ly \
-                and not(x>=(pars.lx-pars.l_notch)/2 and x<=(pars.lx+pars.l_notch)/2 and y>=0.0 and y<=pars.h_notch)
+                and not(x>=pars.left_notch and x<=(pars.left_notch+pars.l_notch) and y>=0.0 and y<=pars.h_notch)
     
     @staticmethod
     def get_regular_grid_points(pars, finement=2.0, x_range=None, include_edges=True):
