@@ -532,6 +532,7 @@ def extrude_triangled_mesh_by_meshio(ff_mesh_surface, ff_mesh_extruded, dz, res=
     shift_nodes_side = [0, n_ps * res[0]]
     res_total = sum(res)
     ps_3d = np.concatenate((ps3, np.zeros((res_total*n_ps,3))), axis=0)
+    extruded_point_data = {k: np.concatenate((pd, np.zeros(res_total*len(pd)))) for k, pd in mesh.point_data.items()}
     
     dzs = [dz_of_i(i) for i in range(n_ps)]
     if not all([len(dz_i)==num_sides for dz_i in dzs]):
@@ -551,12 +552,15 @@ def extrude_triangled_mesh_by_meshio(ff_mesh_surface, ff_mesh_extruded, dz, res=
                 else:
                     ps_3d[i+shift,:] = ps3[i,:] + iz*dz_side/res[i_side]
                 extruded_ids[i].append(i+shift)
+                for k, pd in extruded_point_data.items():
+                    pd[i+shift] = pd[i]
         for k in extruded_node_collections_IDs.keys():
             if i in extruded_node_collections_IDs[k]:
                 extruded_node_collections_IDs[k] += extruded_ids[i]
     mesh.points = ps_3d
     mesh.cells[0].type = 'tetra'
     mesh.cells[0].dim = 3
+    mesh.point_data = extruded_point_data
     extruded_node_collections = {k: ps_3d[v,:] for k, v in extruded_node_collections_IDs.items()}
     
     mesh_2d_cell_data = mesh.cells[0].data
