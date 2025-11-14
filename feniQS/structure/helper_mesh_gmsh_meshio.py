@@ -581,7 +581,10 @@ def extrude_triangled_mesh_by_meshio(ff_mesh_surface, ff_mesh_extruded, dz, res=
                 mesh.cells[0].data[i0+1, :] = [aa[0], aa[1], aa[2]+n_ps+cc, aa[1]+n_ps+cc]
                 mesh.cells[0].data[i0+2, :] = [aa[0], aa[0]+n_ps+cc, aa[1]+n_ps+cc, aa[2]+n_ps+cc]
                 extruded_cells_ids[i].extend([i0, i0+1, i0+2])
-    
+    if 'vtkOriginalCellIds' in mesh.cell_data_dict.keys():
+        mesh.cell_data_dict['vtkOriginalCellIds']['tetra'] = np.arange(mesh.cells[0].data.shape[0])
+    if 'vtkOriginalCellIds' in mesh.cell_data.keys():
+        mesh.cell_data['vtkOriginalCellIds'][0] = np.arange(mesh.cells[0].data.shape[0])
     meshio.write(ff_mesh_extruded, mesh)
     return extruded_node_collections, extruded_ids, extruded_cells_ids
 
