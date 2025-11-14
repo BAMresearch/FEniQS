@@ -246,84 +246,96 @@ def interANDextrapolation_with_Rbf(points, values, new_points, function='multiqu
     rbfi = Rbf(points[:,0], points[:,1], points[:,2], values, function=function, mode=_mode)
     return rbfi(new_points[:,0], new_points[:,1], new_points[:,2])
 
-def interANDextrapolation_with_weightedLS(points, values, new_points, function='linear' \
-                                          , weight_function=None, points_tol=None, _print=False):
+def interANDextrapolation_with_weightedLS(
+        points, values, new_points, function='linear',
+        weight_function=None, points_tol=None,
+        _print=False, regularization=1e-12):
     """
-    Interpolation and extrapolation using weighted least squares (WLS).
-    Two cases:
-        new_points coinciding the given points:
-            --> returns the same value
-        new_points other than given points:
-            --> 'FOR EACH new_point' returns evaluation of an ansatz function (of the given type; i.e. linear by default)
-                that will be fitted using weighted-least-square with the given weight_function.
-                The default of such weight_function is the "inverse of squared norm-2 distances" of given points to each new_point.
-    - It uses cKDTree for fast nearest-neighbor searches (faster).
-    """
-    assert points.shape[1]==new_points.shape[1]
-    assert points.shape[0]==values.shape[0]
-    from scipy.optimize import curve_fit
-    from scipy.spatial import cKDTree
+    Interpolation and extrapolation using weighted least squares (WLS),
+    solving one independent linear model per output column.
 
-    values = values.reshape(values.shape[0], -1)
+    - If new_point coincides with a known point (within points_tol),
+      its known value is returned (pure interpolation).
+    - Else: solve WLS fit locally using distance-based weights.
+    """
+    # Basic checks
+    if function!='linear':
+        raise NotImplementedError(f"The given type of ansatz function '{function}' is not implemented.")
+    n, dim = points.shape
+    values = np.atleast_2d(values)
     lv = values.shape[1]
+    assert dim == new_points.shape[1], "Dim mismatch between points and new_points."
+    assert n == values.shape[0], "Mismatch in number of input points and values."
+    
+    # KDTree for fast NN search
+    from scipy.spatial import cKDTree
+    tree = cKDTree(points)
 
+    # Determine interpolation tolerance if not provided
     if points_tol is None:
-        points_tol = (np.max(points) - np.min(points)) / 10000.
-    
-    tree = cKDTree(points) # Build a k-d tree for fast nearest-neighbor search
-    
+        if n > 1:
+            dists, _ = tree.query(points, k=2)
+            nn = dists[:, 1] # nearest distance (column 1) except a point to itself (column 0)
+            nonzero = nn[nn > 0]
+            points_tol = (np.min(nonzero) if nonzero.size else 1e-6) * 1e-8
+        else:
+            points_tol = 1e-12
+
+    # Default weight function: inverse distance powered
     if weight_function is None:
-        def weight_function(p0, _power=2., _factor=1.):
-            """
-            It returns a vector with size of the number of points, each entry being a weight associated to that point.
-            This weight vector is going to become sigma^(-2), where sigma is uncertainty of data (value) at any point.
-            The more far away a point is w.r.t. p0, its weight is smaller; i.e. the uncertainty is larger.
-            """
-            # weights = [_factor * (np.linalg.norm(p - p0) ** -_power) for p in points]
-            # return np.array(weights)
-            dists = np.linalg.norm(points - p0, axis=1)
-            with np.errstate(divide='ignore'):  # Ignore division by zero warnings
-                weights = _factor * np.where(dists > 0, dists ** -_power, np.inf)
-            return np.nan_to_num(weights, nan=0.0, posinf=1e10)  # Avoid infinities
+        def weight_function(p0, _power=2.0, _factor=1.0):
+            d = np.linalg.norm(points - p0, axis=1)
+            d = np.clip(d, 1e-12, None) # avoid divide by zero
+            return _factor * d ** (-_power)
     else:
         assert callable(weight_function)
     
-    if function=='linear':
-        def _ansatz_function(points, *args):
-            """
-            Returns evaluation of the linear function:
-                f = args[0] * point[0] + args[1] * point[1] + ... + args[-1]
-            for all given points.
-            """
-            """Evaluates a linear function."""
-            points = np.column_stack([points, np.ones(len(points))]) # Add bias term
-            return np.dot(points, np.array(args))
-        p0 = np.ones(points.shape[1] + 1) # Initial guess for curve_fit
-    else:
-        raise NotImplementedError(f"The given type of ansatz function '{function}' is not implemented.")
-    
-    vals = []
-    lv = values.shape[1]
+    # A = [points | 1]: independent variables (with bias term)
+    A = np.hstack((points, np.ones((n, 1))))  # (n, dim+1)
+
+    # WLS for each new point
+    eps = 1e-14
+    vals_out = []
     for pn in new_points:
-        dist, idx = tree.query(pn, distance_upper_bound=points_tol)
-        if dist < points_tol:
-            vals.append(values[idx])
-            continue # No need to fit (found an exact match)
-        ws = weight_function(pn)
-        sigma = np.reciprocal(ws ** 0.5, where=ws != 0)
-        popt_list = []
-        for jj in range(lv):
-            _val = values[:, jj]
-            popt, _ = curve_fit(_ansatz_function, points, _val, p0, sigma=sigma, absolute_sigma=True)
-            popt_list.append(popt)
-        popt_matrix = np.array(popt_list) # Shape: (lv, d+1)
-        pn_extended = np.append(pn, 1.0) # Add bias term for matrix multiplication
-        val = np.dot(popt_matrix, pn_extended) # Apply WLS fit to all columns at once
-        vals.append(val)
+        # Check exact match
+        dist, idx = tree.query(pn)
+        if dist <= points_tol:
+            vals_out.append(values[idx].copy())
+            continue
+        # Compute weights
+        ws = np.asarray(weight_function(pn), dtype=float)
+        if ws.shape[0] != n:
+            raise ValueError("weight_function must return vector of length equal to number of points.")
+        # Ensure nonnegative finite weights
+        ws = np.nan_to_num(ws, nan=0.0, posinf=np.finfo(float).max)
+        ws[ws < 0] = 0.0
+        # If all weights zero: fallback to nearest neighbor
+        if np.all(ws <= eps):
+            vals_out.append(values[idx].copy())
+            continue
+        
+        sqrt_w = np.sqrt(ws) # is multiplied to A and values, which would equivalenty mean weighing the error (A@X-values) with "ws".
+        A_Wsq = sqrt_w[:, None] * A  # weighted A, element-wise
+        A_Wsq_T_A_Wsq = A_Wsq.T @ A_Wsq
+        A_Wsq_T_A_Wsq += regularization * np.eye(dim + 1)
+        
+        # Evaluate WLS separately per value column
+        pred = np.zeros(lv)
+        pn_ext = np.append(pn, 1.0)
+        for j in range(lv):
+            y_Wsq = sqrt_w * values[:, j]
+            # Solve min || WA @ beta - Wy ||^2  → WA^T WA beta = WA^T Wy
+            A_Wsq_T_y_Wsq = A_Wsq.T @ y_Wsq
+            try:
+                beta = np.linalg.solve(A_Wsq_T_A_Wsq, A_Wsq_T_y_Wsq)
+            except np.linalg.LinAlgError:
+                # fallback to least-squares
+                beta, *_ = np.linalg.lstsq(A_Wsq, y_Wsq, rcond=None)
+            pred[j] = beta @ pn_ext
+        vals_out.append(pred)
         if _print:
-            print(f"The data-point {pn} is extrapolated from the data.")
-    
-    return np.array(vals)
+            print(f"The data-point {pn} was interpolated/extrapolated using WLS.")
+    return np.vstack(vals_out)
 
 class SumRowsIn2DArray:
     def __init__(self, A, rows_groups, first_fix_row=None):
