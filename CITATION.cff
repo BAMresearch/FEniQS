@@ -2,7 +2,10 @@
 # Visit https://bit.ly/cffinit to generate yours today!
 
 cff-version: 1.2.0
-title: A python library for finite element (FE) modelling of static/quasi-static structural mechanics problems with legacy FEniCS
+title: >-
+  A python library for finite element (FE) modelling of
+  static/quasi-static structural mechanics problems with
+  legacy FEniCS
 message: >-
   If you use this software, please cite it using the
   metadata from this file.
@@ -11,24 +14,27 @@ authors:
   - given-names: Abbas
     family-names: Jafari
     orcid: 'https://orcid.org/0009-0008-9604-656X'
-  identifiers:
+identifiers:
   - type: url
     value: 'https://github.com/BAMresearch/FEniQS'
 repository-code: 'https://github.com/BAMresearch/FEniQS'
 abstract: >-
-  This is a python library for finite element (FE) modelling of
-  static/quasi-static structural mechanics problems with legacy FEniCS,
-  which contains the following main modules. Module structure: for
-  defining a structural mechanics experiment, including geometry, mesh,
-  boundary conditions (BCs), and time-varying loadings. The time is
-  quasi-static, i.e. no dynamic (inertia) effects will be accounted for
-  in the problem module as follows. Module material: for handling
-  constitutive laws such as elasticity, gradient damage, plasticity, etc.
-  Module problem: for establishing structural mechanics problems for desired
-  structures and material laws coming from the two above modules, and
-  solving the problems built up. These can be performed for two main
-  cases: static (no time-evolution) that also includes homogenization,
-  and quasi-static (QS).
+  This is a python library for finite element (FE) modelling
+  of static/quasi-static structural mechanics problems with
+  legacy FEniCS, which contains the following main modules.
+  Module structure: for defining a structural mechanics
+  experiment, including geometry, mesh, boundary conditions
+  (BCs), and time-varying loadings. The time is
+  quasi-static, i.e. no dynamic (inertia) effects will be
+  accounted for in the problem module as follows. Module
+  material: for handling constitutive laws such as
+  elasticity, gradient damage, plasticity, etc. Module
+  problem: for establishing structural mechanics problems
+  for desired structures and material laws coming from the
+  two above modules, and solving the problems built up.
+  These can be performed for two main cases: static (no
+  time-evolution) that also includes homogenization, and
+  quasi-static (QS).
 keywords:
   - Finite Element Analysis
   - Legacy FEniCS
