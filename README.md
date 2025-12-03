@@ -1,3 +1,4 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17805725.svg)](https://doi.org/10.5281/zenodo.17805725)
 # FEniQS
 A library for finite element (FE) modelling of static/quasi-static structural mechanics problems with _legacy_ [FEniCS](https://fenicsproject.org/), which contains the following main modules:
 
