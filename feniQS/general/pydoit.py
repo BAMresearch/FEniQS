@@ -48,6 +48,17 @@ class DoitTaskManager:
         nst = self.num_sub_tasks
         return [[True] for i in range(nst)]
 
+def _adjust_task_(task):
+    import types
+    if isinstance(task, DoitTaskManager):
+        t = task.get_task_dict()
+    elif callable(task):
+        t = task()
+    else: # is a dictionary
+        t = {k:v for k,v in task.items()} # Much safer to get copy/reference (due to possible change of task names)
+    if not (isinstance(t, list) or isinstance(t, types.GeneratorType)):
+        t = [t]
+    return t
 
 def run_pydoit_task(tasks, basename
                     , verbosity=2, reset_dep=False
@@ -56,19 +67,8 @@ def run_pydoit_task(tasks, basename
     Source:
         https://pydoit.org/extending.html#example-pre-defined-task
     """
-    import types
     if not isinstance(tasks, list):
         tasks = [tasks]
-    def _adjust(task):
-        if isinstance(task, DoitTaskManager):
-            t = task.get_task_dict()
-        elif callable(task):
-            t = task()
-        else: # is a dictionary
-            t = {k:v for k,v in task.items()} # Much safer to get copy/reference (due to possible change of task names)
-        if not (isinstance(t, list) or isinstance(t, types.GeneratorType)):
-            t = [t]
-        return t
     from doit.task import dict_to_task
     from doit.cmd_base import TaskLoader2
     from doit.doit_cmd import DoitMain
@@ -87,7 +87,7 @@ def run_pydoit_task(tasks, basename
         def load_tasks(self, cmd, pos_args):
             task_list = []
             for task in tasks: # by itself can have subtasks or a single task
-                t = _adjust(task) # get genarator of subtasks, or a list of a single task
+                t = _adjust_task_(task) # get genarator of subtasks, or a list of a single task
                 for td in t:
                     if basename!='':
                         td['name'] = f"{basename}:{td['name']}"
@@ -99,3 +99,47 @@ def run_pydoit_task(tasks, basename
         doit_instance.run(['run'])
     else:
         doit_instance.run(['run'])
+
+def forget_pydoit_task(tasks, basename
+                     , verbosity=2
+                     , dep_file=None):
+    """
+    Similar to 'run_pydoit_task' but only forgets the tasks instead of running them.
+    This is useful when database files of doit are corrupted and need to be reset.
+    """
+    if not isinstance(tasks, list):
+        tasks = [tasks]
+    from doit.task import dict_to_task
+    from doit.cmd_base import TaskLoader2
+    from doit.doit_cmd import DoitMain
+    all_names = []
+    for task in tasks:
+        t = _adjust_task_(task)
+        for td in t:
+            if basename!='':
+                all_names.append(f"{basename}:{td['name']}")
+            else:
+                all_names.append(td['name'])
+    class MyLoader(TaskLoader2):
+        def setup(self, opt_values):
+            pass
+        def load_doit_config(self):
+            conf = {'verbosity': verbosity}
+            if dep_file is not None:
+                import os
+                _path = os.path.dirname(dep_file)
+                if not os.path.exists(_path):
+                    os.makedirs(_path)
+                conf['dep_file'] = dep_file
+            return conf
+        def load_tasks(self, cmd, pos_args):
+            task_list = []
+            for task in tasks: # by itself can have subtasks or a single task
+                t = _adjust_task_(task) # get genarator of subtasks, or a list of a single task
+                for td in t:
+                    if basename!='':
+                        td['name'] = f"{basename}:{td['name']}"
+                    task_list.append(dict_to_task(td))
+            return task_list
+    doit_instance = DoitMain(MyLoader())
+    doit_instance.run(['forget'] + all_names)
