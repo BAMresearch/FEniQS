@@ -11,9 +11,9 @@ f: file (only file name + format)
 ff: full file (path + file name + format)
 """
 
-def scale_mesh_meshio(mesh_or_mesh_file, scale: float \
-                    , ff_scaled_mesh: str = None, binary : bool = True \
-                    , centralize: bool = False):
+def scale_mesh_meshio(mesh_or_mesh_file, scale:float \
+                    , ff_scaled_mesh:str = None, binary:bool = True \
+                    , centralize:bool = False):
     import meshio
     cs0, cells0 = get_mesh_points_and_cells(mesh_or_mesh_file=mesh_or_mesh_file)
     if centralize:
@@ -24,9 +24,11 @@ def scale_mesh_meshio(mesh_or_mesh_file, scale: float \
     if ff_scaled_mesh is not None:
         _dir = os.path.dirname(ff_scaled_mesh)
         make_path(_dir)
-        meshio.write_points_cells(filename=ff_scaled_mesh \
-                                , points=cs, cells=cells0 \
-                                , binary=binary)
+        _kwargs = {'filename': ff_scaled_mesh
+                 , 'points': cs, 'cells': cells0}
+        if any([_f in ff_scaled_mesh for _f in ['.vtk', '.stl']]):
+            _kwargs['binary'] = binary
+        meshio.write_points_cells(**_kwargs)
     return meshio.Mesh(points=cs, cells=cells0)
 
 def get_surface_mesh_from_volume_mesh(mesh_or_mesh_file, ff_mesh_surf=None):
