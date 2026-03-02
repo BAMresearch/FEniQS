@@ -108,9 +108,10 @@ class QSModelPlasticity(QuasiStaticModel):
         for pp in self.pps_default.values():
             self.pps.append(pp)
     
-    def solve(self, solve_options, other_pps=[], _reset_pps=True, write_pars=True):
-        ts, iterations, solve_options = QuasiStaticModel.solve(self, solve_options=solve_options \
-                                        , other_pps=other_pps, _reset_pps=_reset_pps, write_pars=write_pars)
+    def solve(self, solve_options, other_pps=[], _reset_pps=True, write_pars=True, _show_plot=True):
+        ts, iterations, solve_options = QuasiStaticModel.solve(
+            self, solve_options=solve_options, other_pps=other_pps
+          , _reset_pps=_reset_pps, write_pars=write_pars, _show_plot=_show_plot)
         return ts, iterations
     
     def _commit_struct_to_model(self):
@@ -146,8 +147,8 @@ class QSModelPlasticity(QuasiStaticModel):
     def get_reaction_dofs(self, reaction_places):
         return self.struct.get_reaction_dofs(reaction_places, i_u=self.fen.get_iu())
 
-def run_QSM_plasticity_default(pars, solve_options, cls_struct \
-                               , _name=None, _path=None, _msg=True, _return=True):
+def run_QSM_plasticity_default(pars, solve_options, cls_struct
+                             , _name=None, _path=None, _msg=True, _return=True, _show_plot=True):
     ### MODEL ###
     model = get_QSM_Plasticity(
         pars_struct=pars,
@@ -157,7 +158,7 @@ def run_QSM_plasticity_default(pars, solve_options, cls_struct \
         _name=_name,
     )
     ### SOLVE ###
-    model.solve(solve_options)
+    model.solve(solve_options, _show_plot=_show_plot)
     ### POST-PROCESS ###
     pp0 = model.pps[0]
     ## Reaction forces
@@ -167,7 +168,7 @@ def run_QSM_plasticity_default(pars, solve_options, cls_struct \
         rps = solve_options['reaction_places']
     tits = [f"Reaction force at {rp}" for rp in rps]
     file_names = [f"{model._path}reaction_force_{rp}" for rp in rps]
-    fss = pp0.plot_reaction_forces(tits=tits, full_file_names=file_names)
+    fss = pp0.plot_reaction_forces(tits=tits, full_file_names=file_names, _show_plot=_show_plot)
     try:
         struct_loadings = model.struct.loadings
         for ip, rp in enumerate(rps):
@@ -182,7 +183,9 @@ def run_QSM_plasticity_default(pars, solve_options, cls_struct \
                 plt.ylabel('Force')
                 file_name = f"{model._path}load_displacement_{rp}"
                 plt.savefig(f"{file_name}.png", bbox_inches='tight', dpi=500)
-                plt.show()
+                if _show_plot:
+                    plt.show()
+                plt.close()
                 ld = np.array([loaded_us, fs]).T
                 yamlDump_array(ld, f"{file_name}.yaml")
             except KeyError:

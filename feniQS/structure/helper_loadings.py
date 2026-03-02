@@ -29,7 +29,7 @@ class ParsLoading:
 
 def time_varying_loading(fs=1.0, intervals_bounds=None, N=1, t0=0.0, T=1.0, _case='ramp', _degree=1 \
                             , _plot=True, _res=1000, lab_x='t', lab_y='u', sz=14 \
-                            , _save=True, _path='./', _name=None, _format='.png'):
+                            , _save=True, _path='./', _name=None, _format='.png', _show_plot=True):
     """
     A helper method to return desired typical time-varying loading.
     This uses the module py_fenics.fenics_expressions.
@@ -76,15 +76,15 @@ def time_varying_loading(fs=1.0, intervals_bounds=None, N=1, t0=0.0, T=1.0, _cas
     def ramp():
         return ramp_expression(f_max=f, t0=t0, T=T, _degree=_degree \
                                , _plot=_plot0, _res=_res, lab_x=lab_x, lab_y=lab_y, sz=sz, _tit=_tit \
-                                   , _save=_save, _path=_path, _name=_name, _format=_format)
+                                   , _save=_save, _path=_path, _name=_name, _format=_format, _show_plot=_show_plot)
     def sin():
         return cyclic_expression(f_max=f, N=N, t0=t0, T=T, _degree=_degree, _type='sin' \
                                , _plot=_plot0, lab_x=lab_x, lab_y=lab_y, sz=sz, _tit=_tit \
-                                   , _save=_save, _path=_path, _name=_name, _format=_format)
+                                   , _save=_save, _path=_path, _name=_name, _format=_format, _show_plot=_show_plot)
     def zigzag():
         return cyclic_expression(f_max=f, N=N, t0=t0, T=T, _degree=_degree, _type='zigzag' \
                                , _plot=_plot0, lab_x=lab_x, lab_y=lab_y, sz=sz, _tit=_tit \
-                                   , _save=_save, _path=_path, _name=_name, _format=_format)
+                                   , _save=_save, _path=_path, _name=_name, _format=_format, _show_plot=_show_plot)
     tit_switcher = {
                 'ramp': 'Ramp loading over time',
                 'sin': 'Sinusoidal loading over time',
@@ -111,7 +111,7 @@ def time_varying_loading(fs=1.0, intervals_bounds=None, N=1, t0=0.0, T=1.0, _cas
             intervals_bounds = np.linspace(t0, T, len(fs)+1)
         expr = scalar_switcher_expression(intervals_bounds, fs, _degree=_degree, nested_expr=expr0 \
                                           , _plot=_plot, _res=_res, lab_x=lab_x, lab_y=lab_y, sz=sz, _tit=_tit \
-                                   , _save=_save, _path=_path, _name=_name, _format=_format)
+                                   , _save=_save, _path=_path, _name=_name, _format=_format, _show_plot=_show_plot)
     else:
         expr = expr0
     return expr

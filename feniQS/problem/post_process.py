@@ -135,7 +135,7 @@ class PostProcess:
             self.R.vector().set_local(df.assemble(self.fen.get_F_and_u()[0]))
             self.xdmf.write(self.R, t)
     
-    def plot_reaction_forces(self, tits, full_file_names=None, dof='sum', factor=1, marker='.', sz=14):
+    def plot_reaction_forces(self, tits, full_file_names=None, dof='sum', factor=1, marker='.', sz=14, _show_plot=True):
         Fs = []
         for ii in range(len(self.reaction_forces)):
             fs = self.reaction_forces[ii]
@@ -155,7 +155,9 @@ class PostProcess:
             plt.yticks(fontsize=sz)
             if full_file_names is not None:
                 plt.savefig(full_file_names[ii], bbox_inches='tight', dpi=300)
-            plt.show()
+            if _show_plot:
+                plt.show()
+            plt.close()
             Fs.append(f_dof)
         return Fs
         

@@ -205,10 +205,8 @@ def plot_expression_of_t(expr, t0, t_end, ts=None, _res=1000, lab_x='t', lab_y='
             os.makedirs(_path)
         plt.savefig(_path + _name + _format, bbox_inches='tight', dpi=300)
     if _show_plot:
-        plt.ion()
-        plt.show(block=False)
-    else:
-        plt.ioff()
+        plt.show()
+    plt.close()
     
 def evaluate_expression_of_t(expr, t0=0.0, t_end=1.0, ts=None, _res=1000):
     if ts is None:

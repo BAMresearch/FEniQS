@@ -104,7 +104,7 @@ class QuasiStaticModel:
         ### POST-PROCESS ###
         pass
 
-    def solve(self, solve_options, other_pps=[], _reset_pps=True, write_pars=True):
+    def solve(self, solve_options, other_pps=[], _reset_pps=True, write_pars=True, _show_plot=True):
         if not self.established:
             raise NotImplementedError("No FEniCS model has yet been built. "
                 + "Consider overwriting method 'establish_model' in the model class.")
@@ -147,7 +147,9 @@ class QuasiStaticModel:
                 plt.xlabel('t')
                 plt.ylabel('Iterations number')
                 plt.savefig(self._path + 'iterations.png', bbox_inches='tight', dpi=300)
-                plt.show()
+                if _show_plot:
+                    plt.show()
+                plt.close()
             if write_pars:
                 self.yamlDump_pars()
                 yamlDump_pyObject_toDict(solve_options, self._path + 'solve_options.yaml')
