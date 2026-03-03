@@ -88,8 +88,12 @@ class PostProcessShell(PostProcess):
             Mxy = M_vec[:,2]
             qxz = Q_vec[:,0]
             qyz = Q_vec[:,1]
-            Neq = self.eqs_il.eq_equivalent_N(Nx=Nx, Ny=Ny, Nxy=Nxy, normalize=True, thickness=self._thickness)
-            Meq = self.eqs_il.eq_equivalent_M(Mx=Mx, My=My, Mxy=Mxy, normalize=True, thickness=self._thickness)
+            # Since yield stress self.eqs_il.y0 is set to dummy '1.0'
+            # , normalization of 'eq_equivalent_N' and 'eq_equivalent_M' does not make sense.
+            Neq = self.eqs_il.eq_equivalent_N(Nx=Nx, Ny=Ny, Nxy=Nxy
+                                            , normalize=False, thickness=self._thickness)
+            Meq = self.eqs_il.eq_equivalent_M(Mx=Mx, My=My, Mxy=Mxy
+                                            , normalize=False, thickness=self._thickness)
             sig_eq0, sig_eq = self.eqs_il.eq_stress_single(Nx=Nx, Ny=Ny, Nxy=Nxy \
                                                   , Mx=Mx, My=My, Mxy=Mxy \
                                                   , qxz=qxz, qyz=qyz, thickness=self._thickness)
