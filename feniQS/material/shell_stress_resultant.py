@@ -7,7 +7,8 @@ pth_shell_stress_resultant.add_script(pth_fenics_mechanics)
 
 class StressNormIlyushin:
     A = np.array([[1., -0.5, 0.], [-0.5, 1., 0.], [0., 0., 3.]])
-    def __init__(self, coupling=True, alpha=0.25, y0=1.0, thickness=1.0):
+    def __init__(self, coupling=True, alpha=0.25, y0=1.0
+               , thickness=1.0, uniform_thickness=True):
         """
         This class concerns the so-called "Ilyushin" norm of stress resultant components
         , which is relevant for the perfect plasticity.
@@ -21,15 +22,20 @@ class StressNormIlyushin:
         self.y0 = y0 # uniaxial yield stress
         self.thickness = thickness
         self.coupling = coupling
+        self.uniform_thickness = uniform_thickness
         self._n0, self._m0, self._q0 = StressNormIlyushin.yield_stress_resultants(
-            y0=self.y0, thickness=self.thickness)
-        self._Ay_0 = StressNormIlyushin.yield_matrix(s=0. \
-                    , _n0=self._n0, _m0=self._m0, _q0=self._q0) # corresponds to "NO coupling"
-        if self.coupling:
-            self._Ay_1 = StressNormIlyushin.yield_matrix(s=1. \
-                        , _n0=self._n0, _m0=self._m0, _q0=self._q0)
-            self._Ay_2 = StressNormIlyushin.yield_matrix(s=-1. \
-                        , _n0=self._n0, _m0=self._m0, _q0=self._q0)
+            y0=self.y0, thickness=self.thickness) # These are used for normalizing the equivalent stresses.
+        
+        if self.uniform_thickness:
+            # The following are used for matrix-based computations
+            # , which are only implemented for a uniform thickness case (for now).
+            self._Ay_0 = StressNormIlyushin.yield_matrix(s=0. \
+                        , _n0=self._n0, _m0=self._m0, _q0=self._q0) # corresponds to "NO coupling"
+            if self.coupling:
+                self._Ay_1 = StressNormIlyushin.yield_matrix(s=1. \
+                            , _n0=self._n0, _m0=self._m0, _q0=self._q0)
+                self._Ay_2 = StressNormIlyushin.yield_matrix(s=-1. \
+                            , _n0=self._n0, _m0=self._m0, _q0=self._q0)
 
     def eq_equivalent_N(self, Nx, Ny, Nxy, normalize=True, thickness=None):
         if thickness is None:
@@ -103,27 +109,28 @@ class StressNormIlyushin:
         else:
             s_eq = s_eq0
         
-        # (2) Using "_Ay_s" matrix (by y0=1.)
-        s_vector = np.array([Nx, Ny, Nxy, Mx, My, Mxy, qxz, qyz])
-            # With no coupling (s=0) is computed by default.
-        if thickness==self.thickness and self.y0==1.0:
-            _Ay_0 = self._Ay_0
-        else:
-            _n0, _m0, _q0 = StressNormIlyushin.yield_stress_resultants(y0=1., thickness=thickness)
-            _Ay_0 = StressNormIlyushin.yield_matrix(s=0, _n0=_n0, _m0=_m0, _q0=_q0)
-        s_eq0_2 = np.einsum('mi,mn,ni->i', s_vector, _Ay_0, s_vector)
-        if self.coupling:
+        # (2) Using "_Ay_s" matrix (by y0=1.), only for uniform thickness case (for now).
+        if self.uniform_thickness:
+            s_vector = np.array([Nx, Ny, Nxy, Mx, My, Mxy, qxz, qyz])
+                # With no coupling (s=0) is computed by default.
             if thickness==self.thickness and self.y0==1.0:
-                _Ay_s = np.array([self._Ay_1 if si==1 else self._Ay_2 for si in s])
+                _Ay_0 = self._Ay_0
             else:
                 _n0, _m0, _q0 = StressNormIlyushin.yield_stress_resultants(y0=1., thickness=thickness)
-                _Ay_s = np.array([StressNormIlyushin.yield_matrix(s=si, _n0=_n0, _m0=_m0, _q0=_q0) for si in s])
-            s_eq_2 = np.einsum('mi,imn,ni->i', s_vector, _Ay_s, s_vector)
-        else:
-            s_eq_2 = s_eq0_2
+                _Ay_0 = StressNormIlyushin.yield_matrix(s=0, _n0=_n0, _m0=_m0, _q0=_q0)
+            s_eq0_2 = np.einsum('mi,mn,ni->i', s_vector, _Ay_0, s_vector)
+            if self.coupling:
+                if thickness==self.thickness and self.y0==1.0:
+                    _Ay_s = np.array([self._Ay_1 if si==1 else self._Ay_2 for si in s])
+                else:
+                    _n0, _m0, _q0 = StressNormIlyushin.yield_stress_resultants(y0=1., thickness=thickness)
+                    _Ay_s = np.array([StressNormIlyushin.yield_matrix(s=si, _n0=_n0, _m0=_m0, _q0=_q0) for si in s])
+                s_eq_2 = np.einsum('mi,imn,ni->i', s_vector, _Ay_s, s_vector)
+            else:
+                s_eq_2 = s_eq0_2
 
-        assert np.linalg.norm(s_eq0 - s_eq0_2) / max(1., np.linalg.norm(s_eq0)) < 1e-12
-        assert np.linalg.norm(s_eq - s_eq_2) / max(1., np.linalg.norm(s_eq)) < 1e-12
+            assert np.linalg.norm(s_eq0 - s_eq0_2) / max(1., np.linalg.norm(s_eq0)) < 1e-12
+            assert np.linalg.norm(s_eq - s_eq_2) / max(1., np.linalg.norm(s_eq)) < 1e-12
 
         if _size==1:
             return np.sqrt(s_eq0)[0], np.sqrt(s_eq)[0]
@@ -170,25 +177,41 @@ class StressNormIlyushin:
         if thickness is None:
             thickness = self.thickness
         
-        s_vector = np.array([Nx, Ny, Nxy, Mx, My, Mxy, qxz, qyz])
+        ## (1)
+        s_eq0 = (Nx**2 + Ny**2 - Nx*Ny + 3.*(Nxy**2)) / (thickness**2)
+        s_eq0 += (Mx**2 + My**2 - Mx*My + 3.*(Mxy**2)) / (self.alpha**2) / (thickness**4)
+        s_eq0 += 3. * (qxz**2 + qyz**2) / (thickness**2)
         if self.coupling:
-            if thickness==self.thickness and self.y0==1.0:
-                _Ay_1 = self._Ay_1
-                _Ay_2 = self._Ay_2
-            else:
-                _n0, _m0, _q0 = StressNormIlyushin.yield_stress_resultants(y0=1., thickness=thickness)
-                _Ay_1 = StressNormIlyushin.yield_matrix(s=1, _n0=_n0, _m0=_m0, _q0=_q0)
-                _Ay_2 = StressNormIlyushin.yield_matrix(s=-1, _n0=_n0, _m0=_m0, _q0=_q0)
-            s_eq_1 = np.einsum('mi,mn,ni->i', s_vector, _Ay_1, s_vector)
-            s_eq_2 = np.einsum('mi,mn,ni->i', s_vector, _Ay_2, s_vector)
-        else: # s=0
-            if thickness==self.thickness and self.y0==1.0:
-                _Ay_0 = self._Ay_0
-            else:
-                _n0, _m0, _q0 = StressNormIlyushin.yield_stress_resultants(y0=1., thickness=thickness)
-                _Ay_0 = StressNormIlyushin.yield_matrix(s=0, _n0=_n0, _m0=_m0, _q0=_q0)
-            s_eq_1 = s_eq_2 = np.einsum('mi,mn,ni->i', s_vector, _Ay_0, s_vector)
+            P = Nx*Mx + Ny*My - 0.5*Nx*My - 0.5*Ny*Mx + 3.*Nxy*Mxy
+            s_eq_1 = s_eq0 + P / (np.sqrt(3.) * self.alpha * (thickness**3)) # s=1
+            s_eq_2 = s_eq0 - P / (np.sqrt(3.) * self.alpha * (thickness**3)) # s=-1
+        else:
+            s_eq_1 = s_eq_2 = s_eq0
         
+        # (2) Using "_Ay_s" matrix (by y0=1.), only for uniform thickness case (for now).
+        if self.uniform_thickness:
+            s_vector = np.array([Nx, Ny, Nxy, Mx, My, Mxy, qxz, qyz])
+            if self.coupling:
+                if thickness==self.thickness and self.y0==1.0:
+                    _Ay_1 = self._Ay_1
+                    _Ay_2 = self._Ay_2
+                else:
+                    _n0, _m0, _q0 = StressNormIlyushin.yield_stress_resultants(y0=1., thickness=thickness)
+                    _Ay_1 = StressNormIlyushin.yield_matrix(s=1, _n0=_n0, _m0=_m0, _q0=_q0)
+                    _Ay_2 = StressNormIlyushin.yield_matrix(s=-1, _n0=_n0, _m0=_m0, _q0=_q0)
+                _s_eq_1 = np.einsum('mi,mn,ni->i', s_vector, _Ay_1, s_vector)
+                _s_eq_2 = np.einsum('mi,mn,ni->i', s_vector, _Ay_2, s_vector)
+            else: # s=0
+                if thickness==self.thickness and self.y0==1.0:
+                    _Ay_0 = self._Ay_0
+                else:
+                    _n0, _m0, _q0 = StressNormIlyushin.yield_stress_resultants(y0=1., thickness=thickness)
+                    _Ay_0 = StressNormIlyushin.yield_matrix(s=0, _n0=_n0, _m0=_m0, _q0=_q0)
+                _s_eq_1 = _s_eq_2 = np.einsum('mi,mn,ni->i', s_vector, _Ay_0, s_vector)
+            
+            assert np.linalg.norm(s_eq_1 - _s_eq_1) / max(1., np.linalg.norm(s_eq_1)) < 1e-12
+            assert np.linalg.norm(s_eq_2 - _s_eq_2) / max(1., np.linalg.norm(s_eq_2)) < 1e-12
+
         if _size==1:
             return np.sqrt(s_eq_1)[0], np.sqrt(s_eq_2)[0]
         else:

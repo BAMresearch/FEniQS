@@ -16,7 +16,6 @@ class PostProcessShell(PostProcess):
             self._form_compiler_parameters = {"quadrature_degree":self.integ_degree,
                                               "quad_scheme":"default",
                                               }
-            self.eqs_il = StressNormIlyushin(thickness=self.fen.thickness, coupling=True)
             
             ## DG spaces/functions (For visualization)
             elem_dg3 = df.VectorElement("DG", self.fen.mesh.ufl_cell(), degree=self.DG_degree, dim=3)
@@ -34,6 +33,23 @@ class PostProcessShell(PostProcess):
             self.sig_eq_dg = df.Function(self.i_dg, name='EqSig_s')    # corresponding to s=sign(P) (see feniQS.material.shell_stress_resultant)
             self.sig_eq_dg_1 = df.Function(self.i_dg, name='EqSig_s1') # corresponding to s=1 (see feniQS.material.shell_stress_resultant)
             self.sig_eq_dg_2 = df.Function(self.i_dg, name='EqSig_s2') # corresponding to s=-1 (see feniQS.material.shell_stress_resultant)
+            
+            if np.isscalar(self.fen.thickness):
+                self._thickness = self.fen.thickness
+                _t = self._thickness
+                _uniform_t = True
+                print(f"Ilyushin Stress Resultant:\n\tThe uniform thickness '{_t:.3e}' is used for normalizing the equivalent stresses.")
+            else:
+                _thickness = df.Function(self.i_dg, name='Thickness') # The thickness function is projected to DG-0 space for visualization.
+                ff = df.project
+                ff(v=self.fen.thickness, V=self.i_dg, function=_thickness
+                 , form_compiler_parameters=self._form_compiler_parameters)
+                self._thickness = _thickness.vector().get_local()
+                _t = np.mean(self._thickness) # use mean thickness for computing normalization quantities in 'StressNormIlyushin'.
+                _uniform_t = False
+                print(f"Ilyushin Stress Resultant:\n\tThe everage thickness '{_t:.3e}' is used for normalizing the equivalent stresses.")
+            
+            self.eqs_il = StressNormIlyushin(thickness=_t, coupling=True, uniform_thickness=_uniform_t)
 
     def __call__(self, t, logger):
         super().__call__(t, logger)
@@ -72,14 +88,14 @@ class PostProcessShell(PostProcess):
             Mxy = M_vec[:,2]
             qxz = Q_vec[:,0]
             qyz = Q_vec[:,1]
-            Neq = self.eqs_il.eq_equivalent_N(Nx=Nx, Ny=Ny, Nxy=Nxy, normalize=True)
-            Meq = self.eqs_il.eq_equivalent_M(Mx=Mx, My=My, Mxy=Mxy, normalize=True)
+            Neq = self.eqs_il.eq_equivalent_N(Nx=Nx, Ny=Ny, Nxy=Nxy, normalize=True, thickness=self._thickness)
+            Meq = self.eqs_il.eq_equivalent_M(Mx=Mx, My=My, Mxy=Mxy, normalize=True, thickness=self._thickness)
             sig_eq0, sig_eq = self.eqs_il.eq_stress_single(Nx=Nx, Ny=Ny, Nxy=Nxy \
                                                   , Mx=Mx, My=My, Mxy=Mxy \
-                                                  , qxz=qxz, qyz=qyz)
+                                                  , qxz=qxz, qyz=qyz, thickness=self._thickness)
             sig_eq_1, sig_eq_2 = self.eqs_il.eq_stresses_double(Nx=Nx, Ny=Ny, Nxy=Nxy \
                                                                 , Mx=Mx, My=My, Mxy=Mxy \
-                                                                , qxz=qxz, qyz=qyz)
+                                                                , qxz=qxz, qyz=qyz, thickness=self._thickness)
             self.N_eq_nrm_dg.vector()[:] = Neq[:]
             self.M_eq_nrm_dg.vector()[:] = Meq[:]
             self.sig_eq0_dg.vector()[:] = sig_eq0[:]
