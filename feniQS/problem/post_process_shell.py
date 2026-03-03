@@ -47,7 +47,7 @@ class PostProcessShell(PostProcess):
                 self._thickness = _thickness.vector().get_local()
                 _t = np.mean(self._thickness) # use mean thickness for computing normalization quantities in 'StressNormIlyushin'.
                 _uniform_t = False
-                print(f"Ilyushin Stress Resultant:\n\tThe everage thickness '{_t:.3e}' is used for normalizing the equivalent stresses.")
+                print(f"Ilyushin Stress Resultant:\n\tThe average thickness '{_t:.3e}' is used for normalizing the equivalent stresses.")
             
             self.eqs_il = StressNormIlyushin(thickness=_t, coupling=True, uniform_thickness=_uniform_t)
 
