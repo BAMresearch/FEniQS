@@ -153,6 +153,30 @@ class QuasiStaticModel:
             if write_pars:
                 self.yamlDump_pars()
                 yamlDump_pyObject_toDict(solve_options, self._path + 'solve_options.yaml')
+                # FEM features (e.g. number of total DOFs & number of DOFs for BCs)
+                fem_features = {'num_DOFs_total': self.fen.get_i_full().dim()}
+                _a = 0
+                for i, bc_DR in enumerate(self.fen.bcs_DR):
+                    _n = len(bc_DR.get_boundary_values())
+                    fem_features[f"num_DOFs_BC_DR_hom_{i+1}"] = _n
+                    _a += _n
+                assert _a==len(self.fen.bcs_DR_dofs) \
+                    , (f"The total number of DOFs for Dirichlet BCs is not consistent with "
+                       f"the sum of DOFs of individual DR BCs.\n{_a} != {len(self.fen.bcs_DR_dofs)}")
+                fem_features[f"num_DOFs_BCs_DR_hom_total"] = _a
+                _b = 0
+                for i, bc_DR_inhom in enumerate(self.fen.bcs_DR_inhom):
+                    _n = len(bc_DR_inhom.get_boundary_values())
+                    fem_features[f"num_DOFs_BC_DR_inhom_{i+1}"] = _n
+                    _b += _n
+                assert _b==len(self.fen.bcs_DR_inhom_dofs) \
+                    , (f"The total number of DOFs for inhomogeneous Dirichlet BCs is not consistent with "
+                       f"the sum of DOFs of individual inhomogeneous DR BCs.\n{_b} != {len(self.fen.bcs_DR_inhom_dofs)}")
+                fem_features[f"num_DOFs_BCs_DR_inhom_total"] = _b
+                fem_features[f"num_DOFs_BCs_DR_total"] = _a + _b
+                _c = len(self.fen.bcs_NM_dofs)
+                fem_features[f"num_DOFs_BCs_NM_total"] = _c
+                yamlDump_pyObject_toDict(fem_features, self._path + 'fem_features.yaml')
             
             return ts, iterations, solve_options
     
