@@ -709,27 +709,43 @@ def points_at(XY, _eps=1e-14):
     """
     Return a dolfin.SubDomain object representing all the points listed in XY (each being an np.array)
     """
-    _dim = len(XY[0])
-    def _inside(x):
-        b = False
-        if _dim == 1:
-            for p in XY:
-                b = b or df.near(x[0], p[0], _eps)
-                if b:
-                    break
-        elif _dim == 2:
-            for p in XY:
-                b = b or (df.near(x[0], p[0], _eps) and df.near(x[1], p[1], _eps))
-                if b:
-                    break
-        elif _dim == 3:
-            for p in XY:
-                b = b or (df.near(x[0], p[0], _eps) and df.near(x[1], p[1], _eps) and df.near(x[2], p[2], _eps))
-                if b:
-                    break
-        return b
+    # _dim = len(XY[0])
+    # def _inside(x):
+    #     b = False
+    #     if _dim == 1:
+    #         for p in XY:
+    #             b = b or df.near(x[0], p[0], _eps)
+    #             if b:
+    #                 break
+    #     elif _dim == 2:
+    #         for p in XY:
+    #             b = b or (df.near(x[0], p[0], _eps) and df.near(x[1], p[1], _eps))
+    #             if b:
+    #                 break
+    #     elif _dim == 3:
+    #         for p in XY:
+    #             b = b or (df.near(x[0], p[0], _eps) and df.near(x[1], p[1], _eps) and df.near(x[2], p[2], _eps))
+    #             if b:
+    #                 break
+    #     return b
+    # return df.AutoSubDomain(_inside)
     
-    return df.AutoSubDomain(_inside)
+    """
+    Much more efficient implementation using spatial hashing so that inside(x) runs in O(1).
+    """
+    scale = 1.0 / _eps # Precompute hash scale
+    # Build a hash table (dictionary) of rounded coordinate keys
+    point_hash = set()
+    for p in XY:
+        key = tuple(np.round(np.asarray(p) * scale).astype(np.int64))
+        point_hash.add(key)
+    dim = len(XY[0])
+    class Pts(df.SubDomain):
+        def inside(self, x, on_boundary):
+            # Compute key for coordinate x. Note that a FEniCS point gives x as a plain array.
+            key = tuple(np.round(np.asarray(x[:dim]) * scale).astype(np.int64))
+            return key in point_hash
+    return Pts()
 
 def unique_points_at_dofs(V, dofs, points_tol=None):
     if points_tol is None:
