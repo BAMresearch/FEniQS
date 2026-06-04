@@ -177,6 +177,8 @@ def get_mesh_statistics(mesh_or_mesh_file):
         'num_facets': mesh.num_facets(),
         'r_min': mesh.rmin(),
         'r_max': mesh.rmax(),
+        'h_min': mesh.hmin(),
+        'h_max': mesh.hmax(),
     }
 
 def get_mesh_volume(mesh_or_mesh_file, sum_over_cells=True):
