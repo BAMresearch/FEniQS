@@ -286,11 +286,11 @@ class ElasticShellStressResultantConstitutive():
         if thickness==self.thickness:
             return self._C_bending
         else:
-            return (self.thickness ** 3) * self.D / 12.
+            return (thickness ** 3) * self.D / 12.
     
     def get_C_shear(self, thickness=None):
         thickness = self.thickness if thickness is None else thickness
         if thickness==self.thickness:
             return self._C_shear
         else:
-            return self.shear_correction_factor * self.thickness * self.mu * np.eye(2)
+            return self.shear_correction_factor * thickness * self.mu * np.eye(2)

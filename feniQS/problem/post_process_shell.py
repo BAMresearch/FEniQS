@@ -62,10 +62,10 @@ class PostProcessShell(PostProcess):
             elif self.fen._variational_approach.lower()=='c_matrices_ufl':
                 N = self.fen.N
                 M = self.fen.M
-            elif self._variational_approach.lower()=='c_matrices_numpy':
+            elif self.fen._variational_approach.lower()=='c_matrices_numpy':
                 raise NotImplementedError('To be implemented ...')
             else:
-                raise ValueError(f"Unrecognized _variational_approach: '{self._variational_approach}'.")
+                raise ValueError(f"Unrecognized _variational_approach: '{self.fen._variational_approach}'.")
             
             ### Project stress resultants to DG space
             ff = df.project
