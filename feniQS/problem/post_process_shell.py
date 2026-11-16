@@ -38,7 +38,9 @@ class PostProcessShell(PostProcess):
                 self._thickness = self.fen.thickness
                 _t = self._thickness
                 _uniform_t = True
-                print(f"Ilyushin Stress Resultant:\n\tThe uniform thickness '{_t:.3e}' is used for normalizing the equivalent stresses.")
+                print(f"Ilyushin Stress Resultant:"
+                      f"\n\tThe uniform thickness t = {_t:.3e} is used to convert stress resultants"
+                      f" to equivalent (generalized) stresses: N/t, M/t^2, Q/t.")
             else:
                 _thickness = df.Function(self.i_dg, name='Thickness') # The thickness function is projected to DG-0 space for visualization.
                 ff = df.project
@@ -47,7 +49,10 @@ class PostProcessShell(PostProcess):
                 self._thickness = _thickness.vector().get_local()
                 _t = np.mean(self._thickness) # use mean thickness for computing normalization quantities in 'StressNormIlyushin'.
                 _uniform_t = False
-                print(f"Ilyushin Stress Resultant:\n\tThe average thickness '{_t:.3e}' is used for normalizing the equivalent stresses.")
+                print(f"Ilyushin Stress Resultant:"
+                      f"\n\tThe thickness field (projected to DG-{self.DG_degree}) is used pointwise to convert stress resultants"
+                      f" to equivalent (generalized) stresses: N/t, M/t^2, Q/t."
+                      f"\n\tIts mean value t_mean = {_t:.3e} is only used to initialize the (unused) yield-resultant constants.")
             
             self.eqs_il = StressNormIlyushin(thickness=_t, coupling=True, uniform_thickness=_uniform_t)
 

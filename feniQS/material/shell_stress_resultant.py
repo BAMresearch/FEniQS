@@ -66,7 +66,7 @@ class StressNormIlyushin:
         "generalized stresses" in the literature, which are ('t' stands for thickness):
             Nx/t, Ny/t, Nxy/t: generalized membrane stresses,
             Mx/(t^2), My/(t^2), Mxy/(t^2): generalized bending stresses,
-            qxz/t, qyz/: generalized shear stresses.
+            qxz/t, qyz/t: generalized shear stresses.
 
         This method computes equivalent stress (single output) based on:
             Eq.(9) (with arbitrary alpha) in:
@@ -148,7 +148,7 @@ class StressNormIlyushin:
         "generalized stresses" in the literature, which are ('t' stands for thickness):
             Nx/t, Ny/t, Nxy/t: generalized membrane stresses,
             Mx/(t^2), My/(t^2), Mxy/(t^2): generalized bending stresses,
-            qxz/t, qyz/: generalized shear stresses.
+            qxz/t, qyz/t: generalized shear stresses.
 
         This method computes equivalent stresses (double outputs) based on:
             Eq.(6) (for alpha=0.25) in:
