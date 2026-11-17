@@ -38,20 +38,71 @@ class StressNormIlyushin:
                             , _n0=self._n0, _m0=self._m0, _q0=self._q0)
 
     def eq_equivalent_N(self, Nx, Ny, Nxy, normalize=True, thickness=None):
+        """
+            F: force unit
+            L: length unit
+            t: thickness
+        This method computes/returns equivalent value of the membrane forces:
+            N_eq = sqrt(Nx^2 + Ny^2 - Nx*Ny + 3*Nxy^2)
+        Nx, Ny, Nxy are membrane forces per length with the unit F/L (NOT stress).
+
+        If normalize=False: N_eq is directly returned, with unit F/L (NOT stress).
+        If normalize=True: returns N_eq / n0, where
+            - n0 = t * y0 (see StressNormIlyushin.yield_stress_resultants)
+              is the fully plastic membrane force per length (unit F/L), computed with the given
+              (or default) thickness t, which may also be an array (pointwise thickness).
+            - y0 is in general the uniaxial yield stress (unit F/L^2), and has two possible values:
+                - y0 = 1.0 (dummy & default), which means n0 = t, thus, the method returns
+                  N_eq / t: a stress-like quantity with unit F/L^2
+                  (the through-thickness average von Mises stress due to membrane forces only).
+                - y0 = a given real yield stress. In this case, the method returns a dimensionless ratio
+                  (1 means the fully plastic membrane force is reached).
+        """
         if thickness is None:
             thickness = self.thickness
         N_eq = np.sqrt(Nx**2 + Ny**2 - Nx*Ny + 3.*(Nxy**2))
-        if normalize: # Although self.y0 is by default 1, it still makes sense to normalize N_eq (to account for the effect of thickness).
-            return N_eq / self._n0
+        if normalize:
+            if np.isscalar(thickness) and thickness==self.thickness:
+                _n0 = self._n0
+            else:
+                _n0, _, _ = StressNormIlyushin.yield_stress_resultants(
+                    y0=self.y0, thickness=thickness)
+            return N_eq / _n0
         else:
             return N_eq
     
     def eq_equivalent_M(self, Mx, My, Mxy, normalize=True, thickness=None):
+        """
+            F: force unit
+            L: length unit
+            t: thickness
+        This method computes/returns equivalent value of the bending moments:
+            M_eq = sqrt(Mx^2 + My^2 - Mx*My + 3*Mxy^2)
+        Mx, My, Mxy are moments per length with the unit F (NOT stress).
+
+        If normalize=False: M_eq is directly returned, with unit F (NOT stress).
+        If normalize=True: returns M_eq / m0, where
+            - m0 = t^2 * y0 / 4 (see StressNormIlyushin.yield_stress_resultants)
+              is the fully plastic moment per length (unit F), computed with the given
+              (or default) thickness t, which may also be an array (pointwise thickness).
+            - y0 is in general the uniaxial yield stress (unit F/L^2), and has two possible values:
+                - y0 = 1.0 (dummy & default), which means m0 = t^2 / 4, thus, the method returns
+                  4 * M_eq / t^2: a stress-like quantity with unit F/L^2.
+                  Note that this differs from the peak fibre bending stress,
+                  which is 6 * M / t^2 for linear elastic bending.
+                - y0 = a given real yield stress. In this case, the method returns a dimensionless ratio
+                  (1 means the fully plastic moment is reached).
+        """
         if thickness is None:
             thickness = self.thickness
         M_eq = np.sqrt(Mx**2 + My**2 - Mx*My + 3.*(Mxy**2))
-        if normalize: # Although self.y0 is by default 1, it still makes sense to normalize M_eq (to account for the effect of thickness).
-            return M_eq / self._m0
+        if normalize:
+            if np.isscalar(thickness) and thickness==self.thickness:
+                _m0 = self._m0
+            else:
+                _, _m0, _ = StressNormIlyushin.yield_stress_resultants(
+                    y0=self.y0, thickness=thickness)
+            return M_eq / _m0
         else:
             return M_eq
     
