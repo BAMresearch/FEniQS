@@ -26,15 +26,16 @@ class PostProcessShell(PostProcess):
             self.i_dg = df.FunctionSpace(self.fen.mesh, elem_dg)
             # NOTE: Names of the functions below appear in the xdmf-file (visualization).
             #       F: force unit, L: length unit (e.g. F=N, L=mm).
-            self.N_dg = df.Function(self.i_dg3, name="N_(membrane_force)_[F/L]")         # Membrane force per unit length: F/L
-            self.M_dg = df.Function(self.i_dg3, name="M_(bending_moment)_[F]")           # Bending moment per unit length: F*L/L = F
-            self.Q_dg = df.Function(self.i_dg2, name="Q_(shear_force)_[F/L]")            # Shear force per unit length: F/L
-            self.N_eq_nrm_dg = df.Function(self.i_dg, name="eqN_(membrane_force)_[F/L]") # NOT normalized, NOT stress.
-            self.M_eq_nrm_dg = df.Function(self.i_dg, name="eqM_(bending_moment)_[F]")   # NOT normalized, NOT stress.
-            self.sig_eq0_dg = df.Function(self.i_dg, name='Ilyushin_stress_s0_[F/L2]')   # corresponding to s=0 (i.e. no coupling, see feniQS.material.shell_stress_resultant)
-            self.sig_eq_dg = df.Function(self.i_dg, name='Ilyushin_stress_s_[F/L2]')     # corresponding to s=sign(P) (see feniQS.material.shell_stress_resultant)
-            self.sig_eq_dg_1 = df.Function(self.i_dg, name='Ilyushin_stress_s+_[F/L2]')  # corresponding to s=1 (see feniQS.material.shell_stress_resultant)
-            self.sig_eq_dg_2 = df.Function(self.i_dg, name='Ilyushin_stress_s-_[F/L2]')  # corresponding to s=-1 (see feniQS.material.shell_stress_resultant)
+            self.N_dg = df.Function(self.i_dg3, name="N_(membrane_force)_[F/L]") # Membrane force per unit length: F/L
+            self.M_dg = df.Function(self.i_dg3, name="M_(bending_moment)_[F]")   # Bending moment per unit length: F*L/L = F
+            self.Q_dg = df.Function(self.i_dg2, name="Q_(shear_force)_[F/L]")    # Shear force per unit length: F/L
+            # The following two fields are computed via normalize=True (see below), which therefore are stress-like (F/L^2) quantities.
+            self.N_eq_nrm_dg = df.Function(self.i_dg, name="eqN_(IlyushinMembrane_s0)_[F/L2]") # N_eq / t (membrane part of s0). Stress-like, comparable to eqM.
+            self.M_eq_nrm_dg = df.Function(self.i_dg, name="eqM_(IlyushinBending_s0)_[F/L2]")  # 4 * M_eq / t^2 (bending part of s0). Stress-like, but NOT the peak fibre stress (6 * M / t^2).
+            self.sig_eq0_dg = df.Function(self.i_dg, name='IlyushinStress_s0_[F/L2]')          # corresponding to s=0 (i.e. no coupling, see feniQS.material.shell_stress_resultant)
+            self.sig_eq_dg = df.Function(self.i_dg, name='IlyushinStress_s_[F/L2]')            # corresponding to s=sign(P) (see feniQS.material.shell_stress_resultant)
+            self.sig_eq_dg_1 = df.Function(self.i_dg, name='IlyushinStress_s+_[F/L2]')         # corresponding to s=1 (see feniQS.material.shell_stress_resultant)
+            self.sig_eq_dg_2 = df.Function(self.i_dg, name='IlyushinStress_s-_[F/L2]')         # corresponding to s=-1 (see feniQS.material.shell_stress_resultant)
             
             if np.isscalar(self.fen.thickness):
                 self._thickness = self.fen.thickness
@@ -44,12 +45,12 @@ class PostProcessShell(PostProcess):
                       f"\n\tThe uniform thickness t = {_t:.3e} is used to convert stress resultants"
                       f" to equivalent (generalized) stresses: N/t, M/t^2, Q/t.")
             else:
-                _thickness = df.Function(self.i_dg, name='Thickness') # The thickness function is projected to DG-0 space for visualization.
+                _thickness = df.Function(self.i_dg, name='Thickness') # The thickness function is projected to DG space for visualization.
                 ff = df.project
                 ff(v=self.fen.thickness, V=self.i_dg, function=_thickness
                  , form_compiler_parameters=self._form_compiler_parameters)
                 self._thickness = _thickness.vector().get_local()
-                _t = np.mean(self._thickness) # use mean thickness for computing normalization quantities in 'StressNormIlyushin'.
+                _t = np.mean(self._thickness) # See the message output below.
                 _uniform_t = False
                 print(f"Ilyushin Stress Resultant:"
                       f"\n\tThe thickness field (projected to DG-{self.DG_degree}) is used pointwise to convert stress resultants"
@@ -95,12 +96,12 @@ class PostProcessShell(PostProcess):
             Mxy = M_vec[:,2]
             qxz = Q_vec[:,0]
             qyz = Q_vec[:,1]
-            # Since yield stress self.eqs_il.y0 is set to dummy '1.0'
-            # , normalization of 'eq_equivalent_N' and 'eq_equivalent_M' does not make sense.
+            # Since yield stress self.eqs_il.y0 is set to dummy '1.0', normalize=True returns
+            # stress-like quantities (unit F/L^2): N_eq / t and 4 * M_eq / t^2 (with pointwise thickness).
             Neq = self.eqs_il.eq_equivalent_N(Nx=Nx, Ny=Ny, Nxy=Nxy
-                                            , normalize=False, thickness=self._thickness)
+                                            , normalize=True, thickness=self._thickness) # normalize=True returns stress-like quantity.
             Meq = self.eqs_il.eq_equivalent_M(Mx=Mx, My=My, Mxy=Mxy
-                                            , normalize=False, thickness=self._thickness)
+                                            , normalize=True, thickness=self._thickness) # normalize=True returns stress-like quantity.
             sig_eq0, sig_eq = self.eqs_il.eq_stress_single(Nx=Nx, Ny=Ny, Nxy=Nxy \
                                                   , Mx=Mx, My=My, Mxy=Mxy \
                                                   , qxz=qxz, qyz=qyz, thickness=self._thickness)
