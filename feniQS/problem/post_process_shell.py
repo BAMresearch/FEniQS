@@ -24,15 +24,17 @@ class PostProcessShell(PostProcess):
             self.i_dg2 = df.FunctionSpace(self.fen.mesh, elem_dg2)
             elem_dg = df.FiniteElement("DG", self.fen.mesh.ufl_cell(), degree=self.DG_degree)
             self.i_dg = df.FunctionSpace(self.fen.mesh, elem_dg)
-            self.N_dg = df.Function(self.i_dg3, name="ResultSig_N")
-            self.M_dg = df.Function(self.i_dg3, name="ResultSig_M")
-            self.Q_dg = df.Function(self.i_dg2, name="ResultSig_Q")
-            self.N_eq_nrm_dg = df.Function(self.i_dg, name="N_eq_nrm") # suitable for comparing membrane/bending effects
-            self.M_eq_nrm_dg = df.Function(self.i_dg, name="M_eq_nrm") # suitable for comparing membrane/bending effects
-            self.sig_eq0_dg = df.Function(self.i_dg, name='EqSig_0')   # corresponding to s=0 (i.e. no coupling, see feniQS.material.shell_stress_resultant)
-            self.sig_eq_dg = df.Function(self.i_dg, name='EqSig_s')    # corresponding to s=sign(P) (see feniQS.material.shell_stress_resultant)
-            self.sig_eq_dg_1 = df.Function(self.i_dg, name='EqSig_s1') # corresponding to s=1 (see feniQS.material.shell_stress_resultant)
-            self.sig_eq_dg_2 = df.Function(self.i_dg, name='EqSig_s2') # corresponding to s=-1 (see feniQS.material.shell_stress_resultant)
+            # NOTE: Names of the functions below appear in the xdmf-file (visualization).
+            #       F: force unit, L: length unit (e.g. F=N, L=mm).
+            self.N_dg = df.Function(self.i_dg3, name="N_(membrane_force)_[F/L]")         # Membrane force per unit length: F/L
+            self.M_dg = df.Function(self.i_dg3, name="M_(bending_moment)_[F]")           # Bending moment per unit length: F*L/L = F
+            self.Q_dg = df.Function(self.i_dg2, name="Q_(shear_force)_[F/L]")            # Shear force per unit length: F/L
+            self.N_eq_nrm_dg = df.Function(self.i_dg, name="eqN_(membrane_force)_[F/L]") # NOT normalized, NOT stress.
+            self.M_eq_nrm_dg = df.Function(self.i_dg, name="eqM_(bending_moment)_[F]")   # NOT normalized, NOT stress.
+            self.sig_eq0_dg = df.Function(self.i_dg, name='Ilyushin_stress_s0_[F/L2]')   # corresponding to s=0 (i.e. no coupling, see feniQS.material.shell_stress_resultant)
+            self.sig_eq_dg = df.Function(self.i_dg, name='Ilyushin_stress_s_[F/L2]')     # corresponding to s=sign(P) (see feniQS.material.shell_stress_resultant)
+            self.sig_eq_dg_1 = df.Function(self.i_dg, name='Ilyushin_stress_s+_[F/L2]')  # corresponding to s=1 (see feniQS.material.shell_stress_resultant)
+            self.sig_eq_dg_2 = df.Function(self.i_dg, name='Ilyushin_stress_s-_[F/L2]')  # corresponding to s=-1 (see feniQS.material.shell_stress_resultant)
             
             if np.isscalar(self.fen.thickness):
                 self._thickness = self.fen.thickness
