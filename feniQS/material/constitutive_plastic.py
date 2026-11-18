@@ -96,7 +96,7 @@ class PlasticConsitutivePerfect(ElasticConstitutive):
                 Jac = np.append(A1, A2, axis=0)
                 dx = np.linalg.solve(Jac, np.append(es, ef))
                 sig_c -= dx[0:_d]     
-                dl -= dx[_d:]
+                dl -= dx[_d]
                 f, m, dm, _, _ = self.yf(sig_c)
                 d_eps_p = dl * m # change in plastic strain
                 es = sig_c - sig_tr + self.D @ d_eps_p
@@ -191,8 +191,8 @@ class PlasticConsitutiveRateIndependentHistory(PlasticConsitutivePerfect):
                 Jac = np.append(np.append(A1, A2, axis=0), A3, axis=0)
                 dx = np.linalg.solve(Jac, np.append(np.append(es, ek), ef))
                 sig_c -= dx[0:_d]     
-                k -= dx[_d:_d+1]
-                dl -= dx[_d+1:]
+                k -= dx[_d]
+                dl -= dx[_d+1]
                 f, m, dm, fk, mk = self.yf(sig_c, k)
                 d_eps_p = dl * m # change in plastic strain
                 es = sig_c - sig_tr + self.D @ d_eps_p
