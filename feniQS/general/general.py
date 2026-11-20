@@ -624,15 +624,22 @@ def find_among_points(points, points0, tol):
         _ids: the IDs of entries in points0 which correspond to target points (with the same order as points).
             If any point (of points) is NOT found in points0, then the corresponding _ids will be set to None.
     """
-    if len(points0)==0:
-        _ids = [None for i in range(len(points))]
-    else:
-        _ids = []
-        for p in points:
-            _id = np.linalg.norm(points0 - p, axis = 1).argmin()
-            if np.linalg.norm(points0[_id] - p) > tol:
-                _id = None
-            _ids.append(_id)
+    _ids = [None for i in range(len(points))]
+    if len(points0)==0 or len(points)==0:
+        return _ids
+    from scipy.spatial import cKDTree
+    P = np.asarray(points, dtype=float)
+    P0 = np.asarray(points0, dtype=float)
+    # Points with non-finite coordinates (e.g. NaN at void DVC points) can never match (and are not accepted by cKDTree).
+    ids0 = np.flatnonzero(np.isfinite(P0).all(axis=1)) # indices (in points0) of the finite candidates
+    ids_t = np.flatnonzero(np.isfinite(P).all(axis=1)) # indices (in points) of the finite targets
+    if len(ids0)==0 or len(ids_t)==0:
+        return _ids
+    # Nearest neighbour of every target point (O(n log n) instead of looping over all points0 for each target)
+    dists, nn = cKDTree(P0[ids0]).query(P[ids_t])
+    for i, d, j in zip(ids_t, dists, nn):
+        if d <= tol:
+            _ids[i] = int(ids0[j])
     return _ids
 
 def contour_plot_2d_irregular(xs, ys, zs, res=0.5, _tits=['Title'], xl='', yl='', levels=15 \
