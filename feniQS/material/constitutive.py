@@ -19,6 +19,9 @@ class NormVM:
         self.constraint = constraint
         self.ss_dim = ss_dim(self.constraint)
         self.stress_norm = stress_norm # True: norm of stress, False: norm of strain
+        # The following pre-factor is commonly equal to 1.5 for the von Mises stress norm
+        # , while it is commonly equal to 2/3 for the von Mises strain norm.
+        self._pre_factor = 1.5 if self.stress_norm else 2./3. # applied to the deviatoric part of the stress/strain tensor.
         
         if _ss_vector == 'Voigt':
             if self.stress_norm:
@@ -27,14 +30,17 @@ class NormVM:
                 _fact = 1.5
         elif _ss_vector == 'Mandel':
             _fact = 3.0
-        
-        if self.ss_dim == 1:
-            self.P = np.array([2/3])
-        elif self.ss_dim==3:
+
+        # The following self.P is a weighting matrix (including the Voigt/Mandel shear weights) such that
+        # the weighted quadratic form of the stress/strain vector (ss) equals the double contraction of the
+        # deviatoric tensor with itself; i.e.:     ss.T @ P @ ss = s:s (stress) or e:e (strain).
+        if self.ss_dim == 1: # 1D
+            self.P = np.array([[1./self._pre_factor]]) # In 1D case, this is only used in self.get_norms().
+        elif self.ss_dim==3: # 2D & Plane stress
             self.P = (1/3) * np.array([[2, -1, 0], [-1, 2, 0], [0, 0, _fact]])
-        elif self.ss_dim==4:
+        elif self.ss_dim==4: # 2D & Plane strain
             self.P = (1/3) * np.array([[2, -1, -1, 0], [-1, 2, -1, 0], [-1, -1, 2, 0], [0, 0, 0, _fact]])
-        elif self.ss_dim==6:
+        elif self.ss_dim==6: # 3D
             self.P = (1/3) * np.array( [ [2, -1, -1, 0, 0, 0], [-1, 2, -1, 0, 0, 0], [-1, -1, 2, 0, 0, 0] \
                                        , [0, 0, 0, _fact, 0, 0], [0, 0, 0, 0, _fact, 0], [0, 0, 0, 0, 0, _fact] ] )
     def __call__(self, ss):
@@ -52,12 +58,12 @@ class NormVM:
                 m = np.sign(ss[0])
         else:
             assert (len(ss)==self.ss_dim)
-            se = np.sqrt(1.5 * ss @ self.P @ ss.T)
+            se = np.sqrt(self._pre_factor * ss @ self.P @ ss.T)
             if se == 0:
                 m = np.zeros(self.ss_dim)  # using central difference method
                 # m = np.sqrt(1.5 * np.diag(self.P)) # using forward difference method
             else:
-                m = (1.5 / se) * self.P @ ss
+                m = (self._pre_factor / se) * self.P @ ss
         return se, m
     
     def get_norms(self, sss, s_vm=None):
@@ -70,13 +76,13 @@ class NormVM:
         """
         assert sss.shape[1]==self.ss_dim
         if s_vm is None:
-            return np.sqrt(1.5 * np.einsum('im,mn,in->i', sss, self.P, sss))
+            return np.sqrt(self._pre_factor * np.einsum('im,mn,in->i', sss, self.P, sss))
         else:
             if isinstance(s_vm, np.ndarray):
                 assert sss.shape[0]==len(s_vm)
-                s_vm[:] = np.sqrt(1.5 * np.einsum('im,mn,in->i', sss, self.P, sss))[:]
+                s_vm[:] = np.sqrt(self._pre_factor * np.einsum('im,mn,in->i', sss, self.P, sss))[:]
             elif isinstance(s_vm, df.Function):
-                s_vm.vector().set_local(np.sqrt(1.5 * np.einsum('im,mn,in->i', sss, self.P, sss))[:])
+                s_vm.vector().set_local(np.sqrt(self._pre_factor * np.einsum('im,mn,in->i', sss, self.P, sss))[:])
             else:
                 raise ValueError(f"The type '{type(s_vm)}' for the input 's_vm' is not supported.")
 
