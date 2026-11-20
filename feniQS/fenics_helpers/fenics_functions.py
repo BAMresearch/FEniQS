@@ -422,65 +422,35 @@ class ManyBCs:
         self.u_bc = df.Function(V) # it MUST live on the full mixed-space
         self.u_bc_dofs = V.dofmap().dofs()
         self.sub_ids = sub_ids
-        
-        ## set self.mapper
-        self.mapper = len(points) * [None]
+
+        ## set self.mapper: (n_points, dim) integer array. mapper[i, k] is the index (in the vector of u_bc) of the DOF of the k-th
+        ## component of the BC at points[i]. One loop over the components serves any dimension.
+        pos_in_u_bc = {d: i for i, d in enumerate(self.u_bc_dofs)} # O(1) look-up (instead of 'list.index')
         if self._dim == 1:
-            coords_bc = self.dofs_to_coords[self.dofs]
-            dofs_map = find_mixup(points, coords_bc, tol=tol)
-            if not all(d!=-1 for d in dofs_map):
+            dofs_of_components = [None] # None: all BC dofs
+        else:
+            dofs_of_components = [set(v_bc.sub(k).dofmap().dofs()) for k in range(self._dim)]
+        self.mapper = np.full((len(points), self._dim), -1, dtype=np.int64)
+        for k, dofs_k in enumerate(dofs_of_components):
+            bc_dofs_k = self.dofs if dofs_k is None else [d for d in self.dofs if d in dofs_k] # (set membership is O(1))
+            coords_bc_k = self.dofs_to_coords[bc_dofs_k]
+            ids = find_mixup(points, coords_bc_k, tol=tol) # coords_bc_k[i] = points[ids[i]]
+            if any(_id is None for _id in ids):
                 ## in view of the implementation of the method "find_mixup"
                 raise ValueError('At least one of the points does not match any node of the mesh corresponding to the specified function-space.')
-            aa = [self.u_bc_dofs.index(d) for d in self.dofs] # indices of self.dofs in the dofs of u_bc (in mixed space) : self.dofs[i] = u_bc_dofs[aa[i]]
-            for i, j in enumerate(dofs_map):
-                self.mapper[j] = aa[i]
-        elif self._dim == 2:
-            dofs_x = v_bc.sub(0).dofmap().dofs()
-            dofs_y = v_bc.sub(1).dofmap().dofs()
-            bc_dofs_x = [d for d in self.dofs if d in dofs_x]
-            bc_dofs_y = [d for d in self.dofs if d in dofs_y]
-            coords_bc_x = self.dofs_to_coords[bc_dofs_x]
-            coords_bc_y = self.dofs_to_coords[bc_dofs_y]
-            dofs_map_x = find_mixup(points, coords_bc_x, tol=tol)
-            dofs_map_y = find_mixup(points, coords_bc_y, tol=tol)
-            if not all(d!=-1 for d in dofs_map_x+dofs_map_y):
-                ## in view of the implementation of the method "find_mixup"
-                raise ValueError('At least one of the points does not match any node of the mesh corresponding to the specified function-space.')
-            aa_x = [self.u_bc_dofs.index(d) for d in bc_dofs_x]
-            aa_y = [self.u_bc_dofs.index(d) for d in bc_dofs_y]
-            for i, j in enumerate(dofs_map_x):
-                self.mapper[j] = [aa_x[i]]
-            for i, j in enumerate(dofs_map_y):
-                self.mapper[j].append(aa_y[i])
-        elif self._dim == 3:
-            dofs_x = v_bc.sub(0).dofmap().dofs()
-            dofs_y = v_bc.sub(1).dofmap().dofs()
-            dofs_z = v_bc.sub(2).dofmap().dofs()
-            bc_dofs_x = [d for d in self.dofs if d in dofs_x]
-            bc_dofs_y = [d for d in self.dofs if d in dofs_y]
-            bc_dofs_z = [d for d in self.dofs if d in dofs_z]
-            coords_bc_x = self.dofs_to_coords[bc_dofs_x]
-            coords_bc_y = self.dofs_to_coords[bc_dofs_y]
-            coords_bc_z = self.dofs_to_coords[bc_dofs_z]
-            dofs_map_x = find_mixup(points, coords_bc_x, tol=tol)
-            dofs_map_y = find_mixup(points, coords_bc_y, tol=tol)
-            dofs_map_z = find_mixup(points, coords_bc_z, tol=tol)
-            if not all(d!=-1 for d in dofs_map_x+dofs_map_y+dofs_map_z):
-                ## in view of the implementation of the method "find_mixup"
-                raise ValueError('At least one of the points does not match any node of the mesh corresponding to the specified function-space.')
-            aa_x = [self.u_bc_dofs.index(d) for d in bc_dofs_x]
-            aa_y = [self.u_bc_dofs.index(d) for d in bc_dofs_y]
-            aa_z = [self.u_bc_dofs.index(d) for d in bc_dofs_z]
-            for i, j in enumerate(dofs_map_x):
-                self.mapper[j] = [aa_x[i]]
-            for i, j in enumerate(dofs_map_y):
-                self.mapper[j].append(aa_y[i])
-            for i, j in enumerate(dofs_map_z):
-                self.mapper[j].append(aa_z[i])
-        
+            self.mapper[ids, k] = [pos_in_u_bc[d] for d in bc_dofs_k]
+        self._mapper_flat = self.mapper.flatten()
+
+        ## sub-function of u_bc (sharing its vector), created and set as the value of the BC only once (not on every 'assign')
+        u_bc_sub = self.u_bc
+        for i in self.sub_ids:
+            u_bc_sub = u_bc_sub.split()[i]
+        self._u_bc_sub = u_bc_sub
+        self.bc.set_value(self._u_bc_sub)
+
         if vals is not None:
             self.assign(vals)
-            
+
     def assign(self, vals):
         """
         vals:
@@ -488,7 +458,8 @@ class ManyBCs:
         """
         if self._dim>1:
             assert(self._dim == len(vals[0])) # the given "vals" (of BCs) must be consistent with space_function
-        self.u_bc.vector()[np.array(self.mapper).flatten()] = np.array(vals).flatten()
+        ## The mapper is flattened only once (in the constructor), as 'self._mapper_flat'.
+        self.u_bc.vector()[self._mapper_flat] = np.array(vals).flatten()
             # Shorter way of:
             # if self._dim == 1:
             #     for i, j in enumerate(self.mapper):
@@ -502,10 +473,9 @@ class ManyBCs:
             #         self.u_bc.vector()[j[0]] = vals[i][0]
             #         self.u_bc.vector()[j[1]] = vals[i][1]
             #         self.u_bc.vector()[j[2]] = vals[i][2]
-        u_bc_sub = self.u_bc.copy(deepcopy=True)
-        for i in self.sub_ids:
-            u_bc_sub = u_bc_sub.split()[i]
-        self.bc.set_value(u_bc_sub)
+        ## No copy/split of u_bc is needed here: 'self._u_bc_sub' (built once in the constructor) shares the vector of 'self.u_bc',
+        ## so it already holds the new values. Setting it again just makes sure that the BC takes the updated values.
+        self.bc.set_value(self._u_bc_sub)
 
 class ValuesEvolverInTime:
     def __init__(self, assigner, values, checkpoints, _method='linear'):
