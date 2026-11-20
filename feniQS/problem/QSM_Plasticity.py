@@ -211,6 +211,11 @@ def run_QSM_plasticity_default(pars, solve_options, cls_struct
                 yamlDump_array(_points, f"{model._path}coordinates_{sp}.yaml")
                 yamlDump_array(_sig_comp, f"{model._path}stresses_components_{sp}.yaml")
                 yamlDump_array(_sig_VM, f"{model._path}stresses_VM_{sp}.yaml")
+                _strains = pp0.eval_checked_eps(points=_points)
+                _eps_comp = np.array(_strains['components']) # hierarchy : time, points, strain_components
+                _eps_VM = np.array(_strains['VM']) # hierarchy : time, points
+                yamlDump_array(_eps_comp, f"{model._path}strains_components_{sp}.yaml")
+                yamlDump_array(_eps_VM, f"{model._path}strains_VM_{sp}.yaml")
     except (NotImplementedError):
         print(f"WARNING (Post-process):\n\tAll stress_places '{sps}' were ignored. The 'get_coordinates' method is not implemented/overwritten for the respective structure.")
     ### RETURNs ###

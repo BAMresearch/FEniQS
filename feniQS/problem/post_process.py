@@ -1,4 +1,5 @@
 from feniQS.problem.problem import *
+from feniQS.material.fenics_mechanics import _ss_vector # 'Voigt' or 'Mandel' (not exported by the star-import above)
 
 pth_post_process = CollectPaths('./feniQS/problem/post_process.py')
 pth_post_process.add_script(pth_problem)
@@ -205,7 +206,31 @@ class PostProcess:
                 sig_VM_ts = [sig_VM_read(p) for p in points]
                 vals['VM'].append(np.array(sig_VM_ts))
         return vals
-    
+
+    def eval_checked_eps(self, points):
+        if hasattr(self, 'eps'):
+            eps_read = self.eps
+        else:
+            eps_read = None
+            print(f"WARNING (Post-process):\n\tNo strain components are computed and stored at checkpoints.")
+        if hasattr(self, 'eps_VM'):
+            eps_VM_read = self.eps_VM
+        else:
+            eps_VM_read = None
+            print(f"WARNING (Post-process):\n\tNo VM strains are computed and stored at checkpoints.")
+        vals = {'components': [], 'VM': []}
+        num_checkpoints = len(self.checkpoints)
+        for ts in range(num_checkpoints):
+            if eps_read is not None:
+                self.xdmf_checked.read_checkpoint(eps_read, 'epsilon', ts)
+                eps_ts = [eps_read(p) for p in points]
+                vals['components'].append(np.array(eps_ts))
+            if eps_VM_read is not None:
+                self.xdmf_checked.read_checkpoint(eps_VM_read, 'epsilon_VM', ts)
+                eps_VM_ts = [eps_VM_read(p) for p in points]
+                vals['VM'].append(np.array(eps_VM_ts))
+        return vals
+
     def eval_checked_reaction_forces(self):
         return self.reaction_forces_checked # hierarchy : reactions-group, time, DOFs
     
@@ -246,12 +271,20 @@ class PostProcessElastic(PostProcess):
             self.i_dg_ss = df.FunctionSpace(self.fen.mesh, elem_dg_ss)
             
             self.sig = df.Function(self.i_dg_ss, name='Stress')
+            self.eps = df.Function(self.i_dg_ss, name=f'Strain_{_ss_vector}') # Total strain vector in the Voigt or Mandel notation (i.e. shear components are 2*eps_shear or sqrt(2)*eps_shear, respectively).
             self.sig_VM = df.Function(self.i_dg, name='VM stress')
+            self.eps_VM = df.Function(self.i_dg, name='VM strain')
             self._sig_ufl_vec = sigma_vector(sigma=self.fen.sig_u, constraint=self.fen.mat.constraint)
+            self._eps_ufl_vec = eps_vector(v=self.fen.u_u, constraint=self.fen.mat.constraint)
             self._vm_norm_calculator = NormVM(constraint=self.fen.mat.constraint, stress_norm=True)
+            self._eps_vm_norm_calculator = NormVM(constraint=self.fen.mat.constraint, stress_norm=False)
+            if self.fen.mat.constraint=='PLANE_STRESS':
+                print(f"WARNING (PostProcessor):\n\tThe VM strain neglects the out-of-plane strain (eps_zz) in PLANE_STRESS.")
 
             if self.projection_type=='local':
                 self._local_projector_sig = LocalProjector(expr=self._sig_ufl_vec \
+                                                        , V=self.i_dg_ss, dxm=self.fen.dxm)
+                self._local_projector_eps = LocalProjector(expr=self._eps_ufl_vec \
                                                         , V=self.i_dg_ss, dxm=self.fen.dxm)
             else:
                 self.integ_degree = self.fen.integ_degree
@@ -265,22 +298,37 @@ class PostProcessElastic(PostProcess):
             df.project(v=self._sig_ufl_vec, V=self.i_dg_ss, function=self.sig \
                 , form_compiler_parameters=self._form_compiler_parameters)
 
+    def _project_eps(self):
+        if self.projection_type=='local':
+            self._local_projector_eps(u=self.eps)
+        else:
+            df.project(v=self._eps_ufl_vec, V=self.i_dg_ss, function=self.eps \
+                , form_compiler_parameters=self._form_compiler_parameters)
+
     def __call__(self, t, logger):
         super().__call__(t, logger)
         if self.write_files:
             ### project from quadrature space to DG space
             self._project_sig()
+            self._project_eps()
             ### compute VM stress over DG space
             sss = self.sig.vector().get_local().reshape((-1, self.fen.mat.ss_dim))
             self._vm_norm_calculator.get_norms(sss=sss, s_vm=self.sig_VM)
+            ### compute VM strain over DG space
+            eee = self.eps.vector().get_local().reshape((-1, self.fen.mat.ss_dim))
+            self._eps_vm_norm_calculator.get_norms(sss=eee, s_vm=self.eps_VM)
             ### write projected values to xdmf-files
             self.xdmf.write(self.sig, t)
+            self.xdmf.write(self.eps, t)
             self.xdmf.write(self.sig_VM, t)
-            
+            self.xdmf.write(self.eps_VM, t)
+
             for tt in self.checkpoints:
                 if abs(t - tt) < 1e-9:
                     self.xdmf_checked.write_checkpoint(self.sig, 'sigma', t, append=True)
+                    self.xdmf_checked.write_checkpoint(self.eps, 'epsilon', t, append=True)
                     self.xdmf_checked.write_checkpoint(self.sig_VM, 'sigma_VM', t, append=True)
+                    self.xdmf_checked.write_checkpoint(self.eps_VM, 'epsilon_VM', t, append=True)
 
 class PostProcessGradientDamage(PostProcess):
     def __init__(self, fen, _name='', out_path=None, reaction_dofs=None \
@@ -353,20 +401,30 @@ class PostProcessPlastic(PostProcess):
             self.i_dg_ss = df.FunctionSpace(self.fen.mesh, elem_dg_ss)
             
             self.sig = df.Function(self.i_dg_ss, name='Stress')
+            self.eps = df.Function(self.i_dg_ss, name=f'Strain_{_ss_vector}') # Total strain vector in the Voigt or Mandel notation (i.e. shear components are 2*eps_shear or sqrt(2)*eps_shear, respectively).
             self.eps_p = df.Function(self.i_dg_ss, name='Cumulated plastic strain')
             self.K = df.Function(self.i_dg, name='Cumulated Kappa')
             self.sig_VM = df.Function(self.i_dg, name='VM stress') # on DG space
+            self.eps_VM = df.Function(self.i_dg, name='VM strain') # on DG space
             self._vm_norm_calculator = NormVM(constraint=self.fen.mat.constraint, stress_norm=True)
+            self._eps_vm_norm_calculator = NormVM(constraint=self.fen.mat.constraint, stress_norm=False)
             self._sig_VM_s = df.Function(self.fen.i_hist, name="VM stress") # on Quadrature space
+            self._eps_VM_s = df.Function(self.fen.i_hist, name="VM strain") # on Quadrature space
+            if self.fen.mat.constraint=='PLANE_STRESS':
+                print(f"WARNING (PostProcessor):\n\tThe VM strain neglects the out-of-plane strain (eps_zz) in PLANE_STRESS.")
 
             if self.projection_type=='local':
                 self._local_projector_sig = LocalProjector(expr=self.fen.sig \
+                                                        , V=self.i_dg_ss, dxm=self.fen.dxm)
+                self._local_projector_eps = LocalProjector(expr=self.fen.eps \
                                                         , V=self.i_dg_ss, dxm=self.fen.dxm)
                 self._local_projector_eps_p = LocalProjector(expr=self.fen.eps_p \
                                                         , V=self.i_dg_ss, dxm=self.fen.dxm)
                 self._local_projector_K = LocalProjector(expr=self.fen.kappa \
                                                         , V=self.i_dg, dxm=self.fen.dxm)
                 self._local_projector_sig_VM = LocalProjector(expr=self._sig_VM_s \
+                                                        , V=self.i_dg, dxm=self.fen.dxm)
+                self._local_projector_eps_VM = LocalProjector(expr=self._eps_VM_s \
                                                         , V=self.i_dg, dxm=self.fen.dxm)
             else:
                 self.integ_degree = self.fen.integ_degree
@@ -379,7 +437,14 @@ class PostProcessPlastic(PostProcess):
         else:
             df.project(v=self.fen.sig, V=self.i_dg_ss, function=self.sig \
                 , form_compiler_parameters=self._form_compiler_parameters)
-    
+
+    def _project_eps(self):
+        if self.projection_type=='local':
+            self._local_projector_eps(u=self.eps)
+        else:
+            df.project(v=self.fen.eps, V=self.i_dg_ss, function=self.eps \
+                , form_compiler_parameters=self._form_compiler_parameters)
+
     def _project_eps_p(self):
         if self.projection_type=='local':
             self._local_projector_eps_p(u=self.eps_p)
@@ -401,27 +466,42 @@ class PostProcessPlastic(PostProcess):
             df.project(v=self._sig_VM_s, V=self.i_dg, function=self.sig_VM \
                 , form_compiler_parameters=self._form_compiler_parameters)
 
+    def _project_eps_VM(self):
+        if self.projection_type=='local':
+            self._local_projector_eps_VM(u=self.eps_VM)
+        else:
+            df.project(v=self._eps_VM_s, V=self.i_dg, function=self.eps_VM \
+                , form_compiler_parameters=self._form_compiler_parameters)
+
     def __call__(self, t, logger):
         super().__call__(t, logger)
         if self.write_files:
-            ### compute VM stress over quadrature space
+            ### compute VM stress and VM strain over quadrature space
             sss = self.fen.sig.vector().get_local().reshape((-1, self.fen.mat.ss_dim))
             self._vm_norm_calculator.get_norms(sss=sss, s_vm=self._sig_VM_s)
+            eee = self.fen.eps.vector().get_local().reshape((-1, self.fen.mat.ss_dim))
+            self._eps_vm_norm_calculator.get_norms(sss=eee, s_vm=self._eps_VM_s)
             ### project from quadrature space to DG space
             self._project_sig()
+            self._project_eps()
             self._project_eps_p()
             self._project_K()
             self._project_sig_VM()
+            self._project_eps_VM()
             ### write projected values to xdmf-files
             self.xdmf.write(self.K, t)
             self.xdmf.write(self.sig, t)
+            self.xdmf.write(self.eps, t)
             self.xdmf.write(self.eps_p, t)
             self.xdmf.write(self.sig_VM, t)
-            
+            self.xdmf.write(self.eps_VM, t)
+
             for tt in self.checkpoints:
                 if abs(t - tt) < 1e-9:
                     self.xdmf_checked.write_checkpoint(self.sig, 'sigma', t, append=True)
+                    self.xdmf_checked.write_checkpoint(self.eps, 'epsilon', t, append=True)
                     self.xdmf_checked.write_checkpoint(self.sig_VM, 'sigma_VM', t, append=True)
+                    self.xdmf_checked.write_checkpoint(self.eps_VM, 'epsilon_VM', t, append=True)
 
 class PostProcessPlasticGDM(PostProcess):
     def __init__(self, fen, _name='', out_path=None, reaction_dofs=None \
